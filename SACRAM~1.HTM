@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sacrament Meeting Conductor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy:    #1a3a6b;
+  --navy-lt: #234d8c;
+  --gold:    #c8a542;
+  --gold-lt: #e8c95e;
+  --cream:   #f7f5ef;
+  --white:   #ffffff;
+  --gray-50: #f9f9f8;
+  --gray-100:#f0efea;
+  --gray-200:#e2e1d9;
+  --gray-400:#9d9b8e;
+  --gray-600:#5f5e56;
+  --gray-800:#2d2c27;
+  --green:   #16a34a;
+  --red:     #dc2626;
+  --blue:    #2563eb;
+  --shadow:     0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+  --shadow-md:  0 4px 6px rgba(0,0,0,.1),  0 2px 4px rgba(0,0,0,.06);
+  --shadow-lg:  0 10px 25px rgba(0,0,0,.15);
+  --radius: 10px;
+  --font:   'Inter', system-ui, sans-serif;
+  --serif:  'Merriweather', Georgia, serif;
+}
+html { font-size: 15px; }
+body { font-family: var(--font); background: var(--cream); color: var(--gray-800); min-height: 100vh; }
+
+/* ── App Header ────────────────────────────────────────────── */
+.app-header {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-lt) 100%);
+  color: white; padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-md);
+}
+.app-header h1  { font-size: 1.05rem; font-weight: 600; letter-spacing: .01em; }
+.app-header .subtitle { font-size: .72rem; opacity: .75; margin-top: 2px; }
+.header-logo   { display: flex; align-items: center; gap: 12px; }
+.header-actions{ display: flex; gap: 8px; }
+
+/* ── Tab Nav ───────────────────────────────────────────────── */
+.tab-nav {
+  background: white; border-bottom: 2px solid var(--gray-200);
+  padding: 0 20px; display: flex; gap: 0;
+  position: sticky; top: 57px; z-index: 90;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.tab-btn {
+  padding: 11px 20px; border: none; background: none; cursor: pointer;
+  font-family: var(--font); font-size: .875rem; font-weight: 500; color: var(--gray-600);
+  border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .15s;
+}
+.tab-btn.active    { color: var(--navy); border-bottom-color: var(--navy); }
+.tab-btn:hover:not(.active) { color: var(--gray-800); background: var(--gray-50); }
+
+.main-container { max-width: 880px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+.card-header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--gray-100); background: var(--gray-50); }
+.card-header .icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--navy); color: white; font-size: 14px; flex-shrink: 0; }
+.card-header h2 { font-size: .9rem; font-weight: 600; color: var(--navy); flex: 1; }
+.card-header .badge { font-size: .7rem; padding: 2px 8px; border-radius: 20px; background: var(--gold-lt); color: #7a5c00; font-weight: 600; }
+.card-body { padding: 18px; }
+
+/* ── Forms ─────────────────────────────────────────────────── */
+/* align-items:flex-end keeps all inputs on the same baseline regardless of label height */
+.form-row { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-end; }
+.form-row:last-child { margin-bottom: 0; }
+.form-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.form-group.narrow  { flex: 0 0 150px; }
+.form-group.hymnnum { flex: 0 0 80px; }
+label { font-size: .75rem; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+input[type=text], input[type=date], select, textarea {
+  border: 1.5px solid var(--gray-200); border-radius: 6px;
+  padding: 8px 10px; font-family: var(--font); font-size: .875rem; color: var(--gray-800);
+  background: white; transition: border-color .15s, box-shadow .15s; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(26,58,107,.12); }
+textarea { resize: vertical; min-height: 60px; }
+select { cursor: pointer; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235f5e56' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 32px;
+}
+
+/* ── Brother/Sister Toggle ─────────────────────────────────── */
+.bs-toggle { display: inline-flex; border: 1.5px solid var(--gray-200); border-radius: 5px; overflow: hidden; }
+.bs-btn {
+  padding: 5px 9px; font-size: .75rem; font-weight: 600; font-family: var(--font);
+  border: none; background: white; cursor: pointer; color: var(--gray-600);
+  transition: background .12s, color .12s; letter-spacing: .01em;
+}
+.bs-btn:first-child { border-right: 1px solid var(--gray-200); }
+.bs-btn.active { background: var(--navy); color: white; }
+.bs-btn:hover:not(.active) { background: var(--gray-100); }
+
+/* ── Toggle Switch ─────────────────────────────────────────── */
+.toggle-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.toggle-row .toggle-label { font-size: .875rem; font-weight: 500; flex: 1; }
+.toggle-row .toggle-sublabel { font-size: .75rem; color: var(--gray-600); display: block; font-weight: 400; margin-top: 1px; }
+.toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--gray-200); border-radius: 24px; transition: .2s; }
+.toggle-slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.toggle input:checked + .toggle-slider { background: var(--navy); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+.toggle.fast-sunday input:checked + .toggle-slider { background: #7c3aed; }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-family: var(--font); font-size: .825rem; font-weight: 500; cursor: pointer; border: none; transition: all .15s; text-decoration: none; white-space: nowrap; }
+.btn-primary  { background: var(--navy); color: white; }
+.btn-primary:hover { background: var(--navy-lt); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn-secondary{ background: var(--gray-100); color: var(--gray-800); border: 1.5px solid var(--gray-200); }
+.btn-secondary:hover { background: var(--gray-200); }
+.btn-outline  { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }
+.btn-outline:hover { background: rgba(26,58,107,.06); }
+.btn-danger   { background: #fee2e2; color: var(--red); border: 1.5px solid #fca5a5; }
+.btn-danger:hover { background: #fecaca; }
+.btn-gold     { background: var(--gold); color: white; }
+.btn-success  { background: var(--navy); color: white; padding: 12px 28px; font-size: .95rem; }
+.btn-success:hover { background: var(--navy-lt); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.btn-icon { padding: 6px; min-width: 30px; justify-content: center; }
+.btn-sm   { padding: 5px 10px; font-size: .775rem; }
+
+/* ── Visitor Items ──────────────────────────────────────────── */
+.visitor-list { display: flex; flex-direction: column; gap: 8px; }
+.visitor-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--gray-200); border-radius: 8px; background: var(--gray-50); }
+.visitor-item.recognized     { border-color: #93c5fd; background: #eff6ff; }
+.visitor-item.not-recognized { border-color: #fcd34d; background: #fffbeb; }
+.visitor-item .visitor-info    { flex: 1; }
+.visitor-item .visitor-name    { font-weight: 600; font-size: .875rem; }
+.visitor-item .visitor-calling { font-size: .775rem; color: var(--gray-600); margin-top: 1px; }
+.visitor-item .visitor-script  { font-size: .775rem; color: var(--blue); margin-top: 4px; font-style: italic; }
+.visitor-badge { font-size: .65rem; padding: 2px 7px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+.visitor-badge.recognized     { background: #dbeafe; color: #1d4ed8; }
+.visitor-badge.not-recognized { background: #fef3c7; color: #92400e; }
+
+/* ── Business Items ─────────────────────────────────────────── */
+.business-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.business-item { border: 1.5px solid var(--gray-200); border-radius: 8px; overflow: hidden; transition: border-color .15s; }
+.business-item.active { border-color: var(--navy); }
+.business-item-header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--gray-50); cursor: pointer; user-select: none; }
+.business-item-header:hover { background: var(--gray-100); }
+.business-checkbox { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--gray-400); display: flex; align-items: center; justify-content: center; transition: .15s; flex-shrink: 0; }
+.business-item.active .business-checkbox { background: var(--navy); border-color: var(--navy); color: white; }
+.business-item-label { font-size: .835rem; font-weight: 500; flex: 1; }
+.business-item-body  { padding: 12px; display: none; border-top: 1px solid var(--gray-100); }
+.business-item.active .business-item-body { display: block; }
+
+/* ── Dynamic Tables ─────────────────────────────────────────── */
+.dynamic-table { width: 100%; border-collapse: collapse; }
+.dynamic-table th { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-600); text-align: left; padding: 0 0 6px; border-bottom: 1px solid var(--gray-200); }
+.dynamic-table td { padding: 4px 4px 4px 0; vertical-align: middle; }
+.dynamic-table td:last-child { padding-right: 0; width: 32px; }
+.dynamic-table input { font-size: .825rem; }
+.add-row-btn { margin-top: 8px; font-size: .775rem; color: var(--navy); background: none; border: none; cursor: pointer; font-family: var(--font); display: flex; align-items: center; gap: 4px; font-weight: 500; }
+.add-row-btn:hover { opacity: .75; }
+
+/* ── Program Builder ────────────────────────────────────────── */
+.program-toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.program-list { min-height: 60px; }
+.program-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; background: white; transition: all .15s; }
+.program-item:last-child { margin-bottom: 0; }
+.program-item.dragging  { opacity: .4; border-style: dashed; }
+.program-item.drag-over { border-color: var(--navy); background: #eff6ff; transform: translateY(2px); }
+.drag-handle { cursor: grab; color: var(--gray-400); display: flex; flex-direction: column; gap: 3px; padding: 2px; flex-shrink: 0; }
+.drag-handle:active { cursor: grabbing; }
+.drag-row { display: flex; gap: 3px; }
+.drag-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; display: block; }
+.program-item-icon { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.program-item.speaker .program-item-icon { background: #dbeafe; }
+.program-item.hymn    .program-item-icon { background: #dcfce7; }
+.program-item.break {
+  background: #f0f4ff; border-color: var(--navy); border-style: dashed;
+  justify-content: center; gap: 8px; padding: 8px 16px;
+}
+.program-item.break .break-label {
+  font-size: .75rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--navy); flex: 1; text-align: center;
+}
+.item-fields { flex: 1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.item-fields input { flex: 1; min-width: 120px; }
+.item-fields .hymn-num { flex: 0 0 70px; min-width: 0; }
+.item-type-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-400); min-width: 60px; }
+
+/* ── Fast Sunday Banner ─────────────────────────────────────── */
+.fast-sunday-banner { display: none; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; background: linear-gradient(135deg, #4c1d95, #7c3aed); color: white; font-size: .825rem; }
+.fast-sunday-banner.show { display: flex; align-items: center; gap: 10px; }
+
+/* ── Guidance Boxes ─────────────────────────────────────────── */
+.guidance-box { border-radius: 8px; padding: 12px; margin: 12px 0; font-size: .825rem; line-height: 1.55; }
+.guidance-box.info    { background: #eff6ff; border: 1.5px solid #bfdbfe; color: #1e40af; }
+.guidance-box.warn    { background: #fffbeb; border: 1.5px solid #fde68a; color: #92400e; }
+.guidance-box.success { background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; }
+.guidance-box.no-recog{ background: #fef9c3; border: 1.5px solid #fde047; color: #713f12; }
+.guidance-box strong  { font-weight: 600; display: block; margin-bottom: 4px; }
+
+/* ── Config Tab ─────────────────────────────────────────────── */
+.config-section-divider {
+  font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--gold); display: flex; align-items: center; gap: 8px; margin: 24px 0 12px;
+}
+.config-section-divider::before,
+.config-section-divider::after { content: ''; flex: 1; height: 1px; background: var(--gray-200); }
+.config-section-divider:first-child { margin-top: 0; }
+.config-phrase-item {
+  margin-bottom: 14px; padding: 14px;
+  background: var(--gray-50); border: 1.5px solid var(--gray-200); border-radius: 8px;
+}
+.config-phrase-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+.config-phrase-label  { font-size: .835rem; font-weight: 600; color: var(--gray-800); }
+.config-tokens { font-size: .7rem; color: var(--gray-600); margin-bottom: 7px; font-family: monospace; background: var(--gray-100); border-radius: 4px; padding: 3px 6px; display: inline-block; }
+.config-textarea { width: 100%; border: 1.5px solid var(--gray-200); border-radius: 6px; padding: 8px 10px; font-family: var(--font); font-size: .875rem; color: var(--gray-800); resize: vertical; background: white; }
+.config-textarea:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(26,58,107,.12); }
+
+/* ── Misc ───────────────────────────────────────────────────── */
+.generate-section { text-align: center; padding: 24px 0; }
+.generate-section p { font-size: .825rem; color: var(--gray-600); margin-top: 8px; }
+.text-muted { color: var(--gray-600); font-size: .8rem; }
+.mt-8  { margin-top: 8px; }
+.empty-state { text-align: center; padding: 20px; color: var(--gray-400); font-size: .825rem; }
+.divider { border: none; border-top: 1px solid var(--gray-100); margin: 14px 0; }
+
+/* ── Modal ──────────────────────────────────────────────────── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 300; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.show { display: flex; }
+.modal { background: white; border-radius: 12px; box-shadow: var(--shadow-lg); width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
+.modal-header { padding: 16px 20px; border-bottom: 1px solid var(--gray-200); display: flex; align-items: center; justify-content: space-between; }
+.modal-header h3 { font-size: .95rem; font-weight: 600; color: var(--navy); }
+.modal-body   { padding: 20px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ══════════════════════════════════════════════════════════════
+   SCRIPT OUTPUT
+══════════════════════════════════════════════════════════════ */
+#scriptView { display: none; position: fixed; inset: 0; background: #f8f7f2; z-index: 200; overflow-y: auto; }
+#scriptView.show { display: block; }
+.script-toolbar { background: var(--navy); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; }
+.script-toolbar h2 { font-size: .95rem; font-weight: 600; flex: 1; }
+.script-page { max-width: 680px; margin: 0 auto; padding: 32px 24px 72px; font-family: var(--serif); }
+.script-meeting-header { text-align: center; padding: 18px 20px 16px; margin-bottom: 28px; border-top: 4px solid var(--navy); border-bottom: 4px solid var(--navy); }
+.script-meeting-header .ward-name    { font-size: 1.5rem; font-weight: 700; color: var(--navy); letter-spacing: .02em; text-transform: uppercase; }
+.script-meeting-header .meeting-type { font-size: .85rem; color: var(--gray-600); margin-top: 2px; font-style: italic; font-family: var(--font); }
+.script-meeting-header .meta-row     { display: flex; justify-content: center; gap: 24px; margin-top: 10px; flex-wrap: wrap; font-family: var(--font); font-size: .82rem; color: var(--gray-600); }
+.script-meeting-header .meta-row strong { color: var(--gray-800); }
+.script-sec-head {
+  font-family: var(--font); font-size: .68rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--gold); margin: 28px 0 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.script-sec-head::before, .script-sec-head::after { content: ''; flex: 1; height: 1px; background: var(--gray-200); }
+.script-say { font-size: 1.12rem; line-height: 1.85; color: #1a1a18; margin-bottom: 18px; }
+.pause-mark {
+  display: inline-block; font-family: var(--font); font-size: .62rem; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; color: white;
+  background: var(--navy); padding: 1px 7px; border-radius: 3px;
+  vertical-align: middle; margin: 0 3px; line-height: 1.6;
+}
+.script-hymn-callout {
+  display: flex; align-items: center; gap: 12px;
+  border-left: 4px solid var(--gold); padding: 10px 14px;
+  background: #fffdf0; margin-bottom: 16px; border-radius: 0 6px 6px 0;
+  font-family: var(--font);
+}
+.script-hymn-callout .hc-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--gray-400); display: block; margin-bottom: 2px; }
+.script-hymn-callout .hc-text  { font-size: 1rem; font-weight: 600; color: var(--navy); }
+.script-sacrament-break {
+  margin: 24px 0; padding: 16px; text-align: center;
+  background: var(--navy); color: white; border-radius: 8px; font-family: var(--font);
+}
+.script-sacrament-break .sac-title { font-size: 1rem; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+.script-sacrament-break .sac-sub   { font-size: .75rem; opacity: .7; margin-top: 4px; }
+.script-fast-block { font-style: italic; color: var(--gray-600); font-family: var(--font); font-size: .85rem; border: 1px dashed var(--gray-300); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; }
+.script-conduct-break {
+  margin: 18px 0; padding: 9px 18px;
+  border: 1.5px dashed var(--navy); border-radius: 6px;
+  background: #eef1ff; font-family: var(--font);
+  font-size: .72rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--navy); text-align: center;
+}
+@media print {
+  .script-conduct-break { background: white !important; border-color: #555 !important; color: #333 !important; }
+}
+.script-letter-box {
+  border-left: 3px solid var(--gray-400); border-radius: 0 6px 6px 0;
+  margin: -8px 0 18px 24px; padding: 12px 16px;
+  background: var(--gray-50); font-family: var(--serif); font-size: 1rem;
+  font-style: italic; line-height: 1.75; color: var(--gray-800);
+  white-space: pre-wrap;
+}
+@media print {
+  .script-letter-box { background: white !important; border-left-color: #555 !important; }
+}
+
+@media print {
+  body { background: white; }
+  .app-header, .tab-nav, .script-toolbar, #app, #configTab { display: none !important; }
+  #scriptView { display: block !important; position: static; overflow: visible; }
+  .script-page { padding: 0; max-width: 100%; }
+  /* ── Black & white print optimizations ── */
+  .script-sec-head { color: #333 !important; }
+  .script-sec-head::before, .script-sec-head::after { background: #555 !important; }
+  .script-sacrament-break {
+    background: white !important; color: black !important;
+    border: 2.5px solid black; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .script-sacrament-break .sac-sub { opacity: .6; }
+  .pause-mark {
+    background: #222 !important; color: white !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .script-hymn-callout {
+    background: white !important; border-left-color: #333 !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .script-hymn-callout .hc-label { color: #555 !important; }
+  .script-hymn-callout .hc-text  { color: black !important; }
+  @page { margin: 1.5cm; size: letter; }
+}
+
+/* ── Mobile Script Mode ───────────────────────────────────────── */
+#scriptView.mobile-mode .script-page {
+  max-width: 100%; padding: 14px 14px 60px;
+}
+#scriptView.mobile-mode .script-meeting-header {
+  padding: 12px 14px; margin-bottom: 20px;
+}
+#scriptView.mobile-mode .script-meeting-header .ward-name { font-size: 1.15rem; }
+#scriptView.mobile-mode .script-meeting-header .meta-row  { font-size: .78rem; gap: 10px; }
+#scriptView.mobile-mode .script-say {
+  font-size: 1.3rem; line-height: 2.05; margin-bottom: 22px;
+}
+#scriptView.mobile-mode .script-sec-head {
+  font-size: .72rem; margin: 30px 0 12px;
+}
+#scriptView.mobile-mode .script-hymn-callout {
+  padding: 12px 14px; margin-bottom: 18px;
+}
+#scriptView.mobile-mode .script-hymn-callout .hc-text { font-size: 1.1rem; }
+#scriptView.mobile-mode .script-sacrament-break { padding: 18px 14px; }
+#scriptView.mobile-mode .pause-mark { font-size: .7rem; padding: 2px 9px; }
+@media (max-width: 600px) {
+  .business-grid { grid-template-columns: 1fr; }
+  .form-row { flex-wrap: wrap; }
+  .form-group.narrow { flex: 1; min-width: 140px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ APP HEADER ═══════════ -->
+<header class="app-header">
+  <div class="header-logo">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <path d="M14 2L4 9v16h7v-7h6v7h7V9L14 2z" fill="rgba(255,255,255,.9)"/>
+    </svg>
+    <div>
+      <h1>Sacrament Meeting Conductor</h1>
+      <div class="subtitle">Seguin 1st Ward · Script Builder</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary btn-sm" onclick="clearAll()">↺ Reset</button>
+  </div>
+</header>
+
+<!-- ═══════════ TAB NAV ═══════════ -->
+<nav class="tab-nav">
+  <button class="tab-btn active" id="tbBuilder" onclick="switchTab('builder')">📋 Builder</button>
+  <button class="tab-btn" id="tbConfig"  onclick="switchTab('config')">⚙ Configuration</button>
+</nav>
+
+<!-- ═══════════ BUILDER TAB ═══════════ -->
+<div id="app" class="main-container">
+
+  <!-- 1. Meeting Details -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">📋</div>
+      <h2>Meeting Details</h2>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Ward Name</label>
+          <input type="text" id="wardName" value="Seguin 1st Ward">
+        </div>
+        <div class="form-group narrow">
+          <label>Date</label>
+          <input type="date" id="meetingDate">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Presiding</label>
+          <input type="text" id="presidingName" placeholder="Full name (include title if desired)">
+        </div>
+        <div class="form-group">
+          <label>Conducting</label>
+          <input type="text" id="conductingName" placeholder="Full name (include title if desired)">
+        </div>
+      </div>
+      <hr class="divider">
+      <div class="toggle-row">
+        <div>
+          <span class="toggle-label">🌙 Fast &amp; Testimony Sunday</span>
+          <span class="toggle-sublabel">First Sunday of the month — no assigned speakers, open testimony meeting</span>
+        </div>
+        <label class="toggle fast-sunday">
+          <input type="checkbox" id="fastSunday" onchange="onFastSundayChange()">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Visitor Recognition -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">👤</div>
+      <h2>Visitor Recognition</h2>
+      <span class="badge" id="visitorBadge" style="display:none"></span>
+    </div>
+    <div class="card-body">
+      <p class="text-muted" style="margin-bottom:12px">
+        Per Handbook §29.2.1.1: <em>"Presiding authorities and visiting high councilors should be invited to sit on the stand. General Officers are also invited unless attending their home ward."</em>
+      </p>
+      <div class="visitor-list" id="visitorList">
+        <div class="empty-state" id="visitorEmpty">No visitors added.</div>
+      </div>
+      <div class="mt-8">
+        <button class="btn btn-outline" onclick="openVisitorModal()">+ Add Visitor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Announcements -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">📢</div>
+      <h2>Announcements</h2>
+      <span class="text-muted" style="font-size:.75rem">Keep to a minimum</span>
+    </div>
+    <div class="card-body">
+      <div id="announcementList"></div>
+      <button class="add-row-btn" onclick="addAnnouncement()">+ Add Announcement</button>
+    </div>
+  </div>
+
+  <!-- 4. Music -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">🎵</div>
+      <h2>Music</h2>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group hymnnum">
+          <label>#</label>
+          <input type="text" id="openingHymnNum" placeholder="280">
+        </div>
+        <div class="form-group">
+          <label>Opening Hymn</label>
+          <input type="text" id="openingHymnTitle" placeholder="Hymn title">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group hymnnum">
+          <label>#</label>
+          <input type="text" id="sacHymnNum" placeholder="181">
+        </div>
+        <div class="form-group">
+          <label>Sacrament Hymn</label>
+          <input type="text" id="sacHymnTitle" placeholder="Hymn title">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group hymnnum">
+          <label>#</label>
+          <input type="text" id="closingHymnNum" placeholder="">
+        </div>
+        <div class="form-group">
+          <label>Closing Hymn</label>
+          <input type="text" id="closingHymnTitle" placeholder="Hymn title">
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:4px">
+        <div class="form-group narrow">
+          <label>Chorister</label>
+          <input type="text" id="chorister" placeholder="Name">
+        </div>
+        <div class="form-group narrow">
+          <label>Organist / Pianist</label>
+          <input type="text" id="organist" placeholder="Name">
+        </div>
+        <div class="form-group"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Prayers -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">🙏</div>
+      <h2>Prayers</h2>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Invocation</label>
+          <input type="text" id="invocation" placeholder="Name">
+        </div>
+        <div class="form-group">
+          <label>Benediction</label>
+          <input type="text" id="benediction" placeholder="Name">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Ward Business -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">📜</div>
+      <h2>Ward Business</h2>
+      <span class="text-muted" style="font-size:.75rem">Conducted before the sacrament hymn</span>
+    </div>
+    <div class="card-body">
+      <div class="business-grid">
+
+        <!-- Stake Business -->
+        <div class="business-item" id="bi-stake">
+          <div class="business-item-header" onclick="toggleBusiness('stake')">
+            <div class="business-checkbox" id="bc-stake"></div>
+            <span style="font-size:1rem">🏛️</span>
+            <span class="business-item-label">Stake Business</span>
+          </div>
+          <div class="business-item-body">
+            <div class="form-group">
+              <label>Conducted by</label>
+              <input type="text" id="stake-conductor" placeholder="Name">
+            </div>
+          </div>
+        </div>
+
+        <!-- Releases -->
+        <div class="business-item" id="bi-releases">
+          <div class="business-item-header" onclick="toggleBusiness('releases')">
+            <div class="business-checkbox" id="bc-releases"></div>
+            <span style="font-size:1rem">🕊️</span>
+            <span class="business-item-label">Releases</span>
+          </div>
+          <div class="business-item-body">
+            <p class="text-muted" style="margin-bottom:6px">Vote of thanks only — no opposed vote on releases.</p>
+            <table class="dynamic-table" id="releases-table">
+              <thead><tr><th>Name</th><th>Bro/Sis</th><th>Calling</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addPersonRow('releases','calling')">+ Add Release</button>
+          </div>
+        </div>
+
+        <!-- Sustainings -->
+        <div class="business-item" id="bi-sustainings">
+          <div class="business-item-header" onclick="toggleBusiness('sustainings')">
+            <div class="business-checkbox" id="bc-sustainings"></div>
+            <span style="font-size:1rem">🤝</span>
+            <span class="business-item-label">Sustainings</span>
+          </div>
+          <div class="business-item-body">
+            <table class="dynamic-table" id="sustainings-table">
+              <thead><tr><th>Name</th><th>Bro/Sis</th><th>Calling</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addPersonRow('sustainings','calling')">+ Add Sustaining</button>
+          </div>
+        </div>
+
+        <!-- Letters from HQ -->
+        <div class="business-item" id="bi-letters">
+          <div class="business-item-header" onclick="toggleBusiness('letters')">
+            <div class="business-checkbox" id="bc-letters"></div>
+            <span style="font-size:1rem">✉️</span>
+            <span class="business-item-label">Letters from Church HQ</span>
+          </div>
+          <div class="business-item-body">
+            <div class="form-group">
+              <label>Brief description</label>
+              <textarea id="letters-details" placeholder="e.g. Letter from the First Presidency..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Member Records -->
+        <div class="business-item" id="bi-newrecords">
+          <div class="business-item-header" onclick="toggleBusiness('newrecords')">
+            <div class="business-checkbox" id="bc-newrecords"></div>
+            <span style="font-size:1rem">📂</span>
+            <span class="business-item-label">New Member Records</span>
+          </div>
+          <div class="business-item-body">
+            <p class="text-muted" style="margin-bottom:8px">Membership records transferred into the ward</p>
+            <table class="dynamic-table" id="newrecords-table">
+              <thead><tr><th>Name</th><th>Bro/Sis</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addPersonRow('newrecords','none')">+ Add Member</button>
+          </div>
+        </div>
+
+        <!-- Baby Blessing -->
+        <div class="business-item" id="bi-blessing">
+          <div class="business-item-header" onclick="toggleBusiness('blessing')">
+            <div class="business-checkbox" id="bc-blessing"></div>
+            <span style="font-size:1rem">👶</span>
+            <span class="business-item-label">Naming &amp; Blessing of Child</span>
+          </div>
+          <div class="business-item-body">
+            <div class="guidance-box info" style="margin-bottom:10px; font-size:.78rem">
+              Blessings are <em>usually performed in Fast &amp; Testimony meeting</em> (Handbook §18.6, §29.2.2). Exceptions require bishop approval.
+            </div>
+            <table class="dynamic-table" id="blessing-table">
+              <thead><tr><th>Child's Full Name</th><th>Blessed by</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addBlessingRow()">+ Add Baby Blessing</button>
+          </div>
+        </div>
+
+        <!-- Aaronic Priesthood — New -->
+        <div class="business-item" id="bi-apnew">
+          <div class="business-item-header" onclick="toggleBusiness('apnew')">
+            <div class="business-checkbox" id="bc-apnew"></div>
+            <span style="font-size:1rem">🕊️</span>
+            <span class="business-item-label">Aaronic Priesthood Ordination</span>
+          </div>
+          <div class="business-item-body">
+            <p class="text-muted" style="margin-bottom:8px">Sustaining presented in sacrament meeting (Handbook §18.10.3)</p>
+            <table class="dynamic-table" id="apnew-table">
+              <thead><tr><th>Name</th><th>Office</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addApRow()">+ Add Ordination</button>
+          </div>
+        </div>
+
+        <!-- Aaronic Priesthood — Advancement -->
+        <div class="business-item" id="bi-apadv">
+          <div class="business-item-header" onclick="toggleBusiness('apadv')">
+            <div class="business-checkbox" id="bc-apadv"></div>
+            <span style="font-size:1rem">⬆️</span>
+            <span class="business-item-label">Priesthood Advancement</span>
+          </div>
+          <div class="business-item-body">
+            <table class="dynamic-table" id="apadv-table">
+              <thead><tr><th>Name</th><th>To Office</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addAdvRow()">+ Add Advancement</button>
+          </div>
+        </div>
+
+        <!-- Child of Record Baptism -->
+        <div class="business-item" id="bi-childbapt">
+          <div class="business-item-header" onclick="toggleBusiness('childbapt')">
+            <div class="business-checkbox" id="bc-childbapt"></div>
+            <span style="font-size:1rem">💧</span>
+            <span class="business-item-label">Baptism — Child of Record</span>
+          </div>
+          <div class="business-item-body">
+            <div class="guidance-box info" style="margin-bottom:8px; font-size:.78rem">
+              Children of record are <em>recognized</em> but not presented for a welcome vote (Handbook §29.2.1.1).
+            </div>
+            <table class="dynamic-table" id="childbapt-table">
+              <thead><tr><th>Name</th><th>Bro/Sis</th><th>Date Baptized</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addChildBaptRow()">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Convert Baptism -->
+        <div class="business-item" id="bi-convertbapt">
+          <div class="business-item-header" onclick="toggleBusiness('convertbapt')">
+            <div class="business-checkbox" id="bc-convertbapt"></div>
+            <span style="font-size:1rem">✨</span>
+            <span class="business-item-label">Baptism — Convert / New Member</span>
+          </div>
+          <div class="business-item-body">
+            <div class="guidance-box success" style="margin-bottom:8px; font-size:.78rem">
+              New converts receive a welcome vote by uplifted hand (Handbook §29.2.1.1).
+            </div>
+            <table class="dynamic-table" id="convertbapt-table">
+              <thead><tr><th>Name</th><th>Bro/Sis</th><th>Date</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <button class="add-row-btn" onclick="addConvertBaptRow()">+ Add</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Program Order -->
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">🎤</div>
+      <h2>Program Order</h2>
+      <span class="badge" id="programBadge" style="display:none"></span>
+    </div>
+    <div class="card-body">
+      <div id="fastSundayBanner" class="fast-sunday-banner">
+        <span style="font-size:1.2rem">🌙</span>
+        <div><strong>Fast &amp; Testimony Sunday</strong> — No assigned speakers. After the sacrament, bear a brief testimony and open the pulpit.</div>
+      </div>
+      <div class="program-toolbar">
+        <button class="btn btn-outline" id="addSpeakerBtn" onclick="addProgramItem('speaker')">🎤 Add Speaker</button>
+        <button class="btn btn-secondary" onclick="addProgramItem('hymn')">🎵 Add Intermediate Hymn</button>
+        <button class="btn btn-secondary" onclick="addProgramItem('break')" title="Mark when you stand to conduct — affects now/then tense in the script">⏸ Conduction Break</button>
+      </div>
+      <p class="text-muted" style="margin-bottom:10px">Drag ⠿ to reorder. A <strong>Conduction Break</strong> marks when you stand — hymns immediately after use "now"; others use "then".</p>
+      <div class="program-list" id="programList">
+        <div class="empty-state" id="programEmpty">No program items yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate -->
+  <div class="generate-section">
+    <button class="btn btn-success" onclick="generateScript()">📄 Generate Conductor Script</button>
+    <p>Produces a clean, print-ready script with only the words you need to say</p>
+  </div>
+
+</div><!-- #app -->
+
+<!-- ═══════════ CONFIG TAB ═══════════ -->
+<div id="configTab" class="main-container" style="display:none">
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">⚙</div>
+      <h2>Text Phrase Configuration</h2>
+    </div>
+    <div class="card-body">
+      <p class="text-muted" style="margin-bottom:14px">
+        Edit the exact phrases used in the generated script. Changes save automatically to your browser.
+        Use <strong>Export</strong> to save a <code>sacrament_config.json</code> file alongside this HTML file,
+        and <strong>Import</strong> to restore it on a new computer or after clearing the browser.
+      </p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-outline btn-sm" onclick="exportConfig()">⬇ Export Config JSON</button>
+        <button class="btn btn-secondary btn-sm" onclick="importConfig()">⬆ Import Config JSON</button>
+        <button class="btn btn-danger btn-sm" onclick="resetAllConfig()">↺ Reset All to Defaults</button>
+        <span id="configSaved" style="color:var(--green);font-size:.8rem;font-weight:600;opacity:0;transition:opacity .3s;margin-left:4px">✓ Saved</span>
+      </div>
+      <div id="configPhrases"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SCRIPT VIEW ═══════════ -->
+<div id="scriptView">
+  <div class="script-toolbar">
+    <button class="btn btn-secondary btn-sm" onclick="closeScript()">← Back</button>
+    <h2 id="scriptTitle">Conductor Script</h2>
+    <button class="btn btn-secondary btn-sm" id="mobileToggleBtn" onclick="toggleMobileMode()" title="Mobile-friendly view">📱 Mobile</button>
+    <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print</button>
+  </div>
+  <div class="script-page" id="scriptContent"></div>
+</div>
+
+<!-- ═══════════ VISITOR MODAL ═══════════ -->
+<div class="modal-overlay" id="visitorModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Visiting Leader / Guest</h3>
+      <button class="btn btn-icon btn-secondary" onclick="closeVisitorModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Calling / Position</label>
+        <select id="visitorCalling" onchange="onCallingChange()">
+          <option value="">— Select calling —</option>
+          <option value="highcouncilor">High Councilor</option>
+          <option value="stakepres">Stake President</option>
+          <option value="stakepres-counselor">Counselor in Stake Presidency</option>
+          <option value="templepres">Temple President</option>
+          <option value="templematron">Temple Matron</option>
+          <option value="missionpres">Mission President</option>
+          <option value="area70">Area Seventy</option>
+          <option value="genss">General Sunday School Presidency</option>
+          <option value="genprimary">General Primary Presidency</option>
+          <option value="genyw">General Young Women Presidency</option>
+          <option value="genrs">General Relief Society Presidency</option>
+          <option value="presidingbishopric">Member of Presiding Bishopric</option>
+          <option value="firstq70">Member of First or Second Quorum of Seventy</option>
+          <option value="presidency70">Member of Presidency of the Seventy</option>
+          <option value="firstpresidency">Member of First Presidency</option>
+          <option value="apostle">Apostle / Member of Quorum of the Twelve</option>
+        </select>
+      </div>
+
+      <!-- High Councilor assignment question -->
+      <div id="hcQuestion" class="hidden" style="margin-bottom:12px">
+        <label style="font-size:.75rem;font-weight:600;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Is this high councilor attending on official assignment?</label>
+        <div style="display:flex;gap:16px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.875rem"><input type="radio" name="hcAssignment" value="yes" onchange="onHcChange()"> Yes — on assignment</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.875rem"><input type="radio" name="hcAssignment" value="no"  onchange="onHcChange()"> No — attending informally</label>
+        </div>
+      </div>
+
+      <!-- General Officer home ward question -->
+      <div id="goQuestion" class="hidden" style="margin-bottom:12px">
+        <label style="font-size:.75rem;font-weight:600;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Is this person attending their home ward?</label>
+        <div style="display:flex;gap:16px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.875rem"><input type="radio" name="goHomeWard" value="yes" onchange="onGoChange()"> Yes — home ward</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.875rem"><input type="radio" name="goHomeWard" value="no"  onchange="onGoChange()"> No — visiting</label>
+        </div>
+      </div>
+
+      <div id="visitorGuidance" class="hidden"></div>
+
+      <div id="visitorNameSection" class="hidden" style="margin-top:12px">
+        <div class="form-group">
+          <label>Name (as you want it to appear in the script)</label>
+          <input type="text" id="visitorName" placeholder="Full name">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeVisitorModal()">Cancel</button>
+      <button class="btn btn-primary" id="addVisitorBtn" onclick="addVisitor()" disabled>Add to Meeting</button>
+    </div>
+  </div>
+</div>
+
+<style>.hidden { display: none !important; }</style>
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   CONFIGURATION SYSTEM
+   Phrases are stored in localStorage and editable via the
+   Configuration tab. Export/import to a JSON file for backup.
+══════════════════════════════════════════════════════════════ */
+// {CALLOUT} is a special token: the hymn callout box is inserted at that position.
+// Text before {CALLOUT} becomes one spoken-text block; text after becomes another.
+const DEFAULT_PHRASES = {
+  welcome:
+    'Good morning and welcome to The Church of Jesus Christ of Latter-day Saints, I am {conducting} and will be conducting our Sacrament meeting Services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time and those watching online.',
+  openingHymnIntro:
+    'We will begin our service by the congregation singing our opening hymn.{CALLOUT}',
+  invocationIntro:
+    'after which {invocation} will offer our invocation.',
+  sacHymnIntro:
+    'We will now prepare for the Sacred Ordinance of Sacrament by singing the sacrament hymn{CALLOUT}After the sacrament hymn, our priesthood holders will reverently bless and pass the sacrament to all of us in the congregation, while they are preparing and passing the sacrament we invite you to ponder the sacrifice and atonement of our Savior Jesus Christ.',
+  afterSacrament:
+    'We thank you for your reverence during the Ordinance of the Sacrament and our service will now continue as follows.',
+  stakeBusiness:
+    'We will now turn the time over to {by} for some Stake business.',
+  closingThanks:
+    'We would like to thank everyone that participated in our Sacrament Service today.',
+  closingHymnIntro:
+    'Our Closing Hymn will be{CALLOUT}',
+  benedictionIntro:
+    'Following the Closing Hymn, {benediction} will offer the benediction.',
+  fastTestimonyOpen:
+    'Brothers and sisters, today is fast and testimony meeting. I am grateful for this opportunity to bear my testimony...',
+  fastPulpitOpen:
+    'The time is now yours to bear your testimonies. We invite you keep your testimonies short and focused on the Savior Jesus Christ',
+  intermediateHymnIntro:
+    'We will{tense} sing an intermediate hymn.{CALLOUT}',
+
+  // ── Visitor Recognition ───────────────────────────────
+  visitorPresides:
+    '{name} is presiding.',
+  visitorRecognizeHC:
+    'We recognize {name}, a member of our Stake High Council, sitting on the stand with us today.',
+  visitorRecognizeStand:
+    'We recognize {name}, {desc}, sitting on the stand with us today.',
+  visitorRecognizeMulti:
+    'We recognize the following visitors sitting on the stand with us today: {list}.',
+
+  // ── Announcements ─────────────────────────────────────
+  announcementIntro:
+    'We have {count} announcement{s} today:',
+
+  // ── Releases ─────────────────────────────────────────
+  releaseSingle:
+    '{title} {name} has been released from {poss} calling as {calling}.\n\nWe propose that {subj} be given a vote of thanks for {poss} service. Those in favor may manifest it by the uplifted hand. {PAUSE}',
+  releaseMulti:
+    'We have released the following members from their callings:\n\n{list}\n\nWe propose that they be given a vote of thanks for their service. Those in favor may manifest it by the uplifted hand. {PAUSE}',
+
+  // ── Sustainings ───────────────────────────────────────
+  sustainSingle:
+    '{title} {name} has been called as {art} {calling}. We ask that {subj} stand.\n\nWe propose that {subj} be sustained. Those in favor may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+  sustainMulti:
+    'We have extended callings to the following members. Please stand as your name is called:\n\n{list}\n\nWe propose that they be sustained. Those in favor may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+
+  // ── Other Ward Business ───────────────────────────────
+  lettersLine:
+    'We have a letter from Church headquarters to be read.',
+  newRecordSingle:
+    'We have received the membership records for {title} {name}. Please stand as your name is read.\n\nPlease join the Bishopric in welcoming {obj} into our Ward Family by the uplifted hand. {PAUSE}',
+  newRecordMulti:
+    'We have received the membership records for the following individuals. Please stand as your names are read:\n\n{list}\n\nPlease join the Bishopric in welcoming these members into our Ward Family by the uplifted hand. {PAUSE}',
+  babyBlessing:
+    'We will now be privileged to witness a baby blessing. {child} will be blessed by {blesser}.\n\nThose who have been invited to participate, please come forward.',
+
+  // ── Aaronic Priesthood ────────────────────────────────
+  apDeacon:
+    'We propose that {name} receive the Aaronic Priesthood and be ordained a Deacon. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+  apOrdination:
+    'We propose that {name} be ordained a {office} in the Aaronic Priesthood. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+  apOrdMulti:
+    'We propose the following to be ordained in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose that can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+  apAdvancement:
+    'We propose that {name} be advanced to the office of {office} in the Aaronic Priesthood. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+  apAdvMulti:
+    'We propose the following to be advanced in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose that can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+
+  // ── Baptisms ──────────────────────────────────────────
+  childBapt:
+    '{title} {name}, please stand. {name} was baptized and confirmed{dateStr}, and we want to congratulate {obj} on this important step in {poss} life.',
+  childBaptMulti:
+    'We are pleased to recognize the baptism and confirmation of the following members. Please stand as your name is called:\n\n{list}\n\nWe want to congratulate each of them on this important step in their lives.',
+  convertBapt:
+    '{title} {name}, please stand. We are pleased to announce the baptism and confirmation of {title} {name}{dateStr}.\n\nAll those that can join the Bishopric in welcoming {title} {name} into the ward please manifest it by the uplifted hand. {PAUSE}',
+  convertBaptMulti:
+    'We are pleased to announce the baptism and confirmation of the following new members. Please stand as your name is called:\n\n{list}\n\nAll those that can join the Bishopric in welcoming these new members into the ward please manifest it by the uplifted hand. {PAUSE}',
+
+  // ── Program Items ─────────────────────────────────────
+  speakerIntro:
+    'Our {ordinal} speaker is {name}.',
+  speakerIntroWithTopic:
+    'Our {ordinal} speaker is {name}. The topic today is "{topic}".',
+};
+
+// Descriptions for the config UI
+// {CALLOUT} in a hymn phrase = where the hymn number/title callout box is inserted.
+// Text before {CALLOUT} → one spoken block. Text after → another spoken block.
+const PHRASE_CONFIG = [
+  // ── Opening ───────────────────────────────────────────────
+  { section:'Opening', key:'welcome',           label:'Welcome Greeting',                rows:5, tokens:'{conducting}, {ward}, {presidingLine} — recognized visitor lines appended automatically' },
+  { section:'Opening', key:'openingHymnIntro',  label:'Opening Hymn Introduction',       rows:2, tokens:'{CALLOUT} = where hymn box appears' },
+  { section:'Opening', key:'invocationIntro',   label:'Invocation Line',                 rows:2, tokens:'{invocation} — blank line printed if name not entered' },
+
+  // ── Visitor Recognition ───────────────────────────────────
+  { section:'Visitor Recognition', key:'visitorPresides',       label:'Presiding Visitor',                    rows:1, tokens:'{name}' },
+  { section:'Visitor Recognition', key:'visitorRecognizeHC',    label:'High Councilor on Assignment',         rows:2, tokens:'{name}' },
+  { section:'Visitor Recognition', key:'visitorRecognizeStand', label:'Other Recognized Visitor (stand)',     rows:2, tokens:'{name}, {desc} = calling description' },
+  { section:'Visitor Recognition', key:'visitorRecognizeMulti', label:'Multiple Visitors (combined line)',    rows:2, tokens:'{list} = semicolon-separated visitor names & callings' },
+
+  // ── Announcements ─────────────────────────────────────────
+  { section:'Announcements', key:'announcementIntro', label:'Announcement Count Intro', rows:1, tokens:'{count} = one/two/several, {s} = "s" or "" for plural' },
+
+  // ── Ward Business — Releases ──────────────────────────────
+  { section:'Ward Business — Releases', key:'releaseSingle', label:'Single Release', rows:4,
+    tokens:'{title} = Bro/Sis, {name}, {poss} = his/her, {calling}, {subj} = he/she, {PAUSE}' },
+  { section:'Ward Business — Releases', key:'releaseMulti',  label:'Multiple Releases', rows:4,
+    tokens:'{list} = one release per line, {PAUSE}' },
+
+  // ── Ward Business — Sustainings ───────────────────────────
+  { section:'Ward Business — Sustainings', key:'sustainSingle', label:'Single Sustaining', rows:5,
+    tokens:'{title}, {name}, {art} = a/an, {calling}, {subj} = he/she, {PAUSE}' },
+  { section:'Ward Business — Sustainings', key:'sustainMulti',  label:'Multiple Sustainings', rows:5,
+    tokens:'{list} = one calling per line, {PAUSE}' },
+
+  // ── Ward Business — Other ─────────────────────────────────
+  { section:'Ward Business — Other', key:'stakeBusiness',   label:'Stake Business Introduction',      rows:2, tokens:'{by} = name of person conducting stake business' },
+  { section:'Ward Business — Other', key:'lettersLine',     label:'Letter from Church HQ',            rows:2, tokens:'No tokens — any details you enter are appended automatically' },
+  { section:'Ward Business — Other', key:'newRecordSingle', label:'New Member Record (single)',       rows:3, tokens:'{title}, {name}, {obj} = him/her, {PAUSE}' },
+  { section:'Ward Business — Other', key:'newRecordMulti',  label:'New Member Records (multiple)',    rows:4, tokens:'{list} = one name per line, {PAUSE}' },
+  { section:'Ward Business — Other', key:'babyBlessing',    label:'Baby Blessing',                    rows:3, tokens:'{child} = child\'s name, {blesser} = who is blessing' },
+
+  // ── Aaronic Priesthood ────────────────────────────────────
+  { section:'Aaronic Priesthood', key:'apDeacon',      label:'New Deacon Ordination (single)',       rows:3, tokens:'{name}, {PAUSE}' },
+  { section:'Aaronic Priesthood', key:'apOrdination',  label:'Teacher/Priest Ordination (single)',   rows:3, tokens:'{name}, {office} = Teacher or Priest, {PAUSE}' },
+  { section:'Aaronic Priesthood', key:'apOrdMulti',    label:'Multiple Ordinations (grouped)',        rows:4, tokens:'{list} = one "{name} — to be ordained a {office}" per line, {PAUSE}' },
+  { section:'Aaronic Priesthood', key:'apAdvancement', label:'Priesthood Advancement (single)',       rows:3, tokens:'{name}, {office} = Teacher or Priest, {PAUSE}' },
+  { section:'Aaronic Priesthood', key:'apAdvMulti',    label:'Multiple Advancements (grouped)',       rows:4, tokens:'{list} = one "{name} — to be ordained a {office}" per line, {PAUSE}' },
+
+  // ── Baptisms ──────────────────────────────────────────────
+  { section:'Baptisms', key:'childBapt',       label:'Child of Record Baptism (single)',   rows:3,
+    tokens:'{title} = Bro/Sis, {name}, {dateStr} = " this Thursday"/" last Friday"/" on [date]"/"", {obj} = him/her, {poss} = his/her' },
+  { section:'Baptisms', key:'childBaptMulti', label:'Child of Record Baptism (multiple)', rows:4,
+    tokens:'{list} = one "{title} {name}{dateStr}" per line' },
+  { section:'Baptisms', key:'convertBapt',      label:'Convert Baptism (single person)',    rows:4,
+    tokens:'{title}, {name}, {dateStr} = " this Thursday"/" last Friday"/"", {PAUSE}' },
+  { section:'Baptisms', key:'convertBaptMulti', label:'Convert Baptism (multiple people)',  rows:4,
+    tokens:'{list} = one "{title} {name}{dateStr}" per line, {PAUSE}' },
+
+  // ── Sacrament ─────────────────────────────────────────────
+  { section:'Sacrament', key:'sacHymnIntro',   label:'Sacrament Hymn Introduction', rows:4, tokens:'{CALLOUT} = where hymn box appears' },
+  { section:'Sacrament', key:'afterSacrament', label:'After Sacrament',              rows:2, tokens:'No tokens' },
+
+  // ── Program — Speakers ────────────────────────────────────
+  { section:'Program — Speakers', key:'speakerIntro',          label:'Speaker Introduction',            rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
+  { section:'Program — Speakers', key:'speakerIntroWithTopic', label:'Speaker Introduction with Topic', rows:2, tokens:'{ordinal}, {name}, {topic}' },
+
+  // ── Program — Hymns ───────────────────────────────────────
+  { section:'Program — Hymns', key:'intermediateHymnIntro', label:'Intermediate Hymn Introduction', rows:2,
+    tokens:'{tense} = " now" / " then" / "" based on conduction break (includes leading space), {CALLOUT}' },
+
+  // ── Closing ───────────────────────────────────────────────
+  { section:'Closing', key:'closingThanks',   label:'Closing Thanks',          rows:2, tokens:'No tokens — chorister/organist appended automatically if entered' },
+  { section:'Closing', key:'closingHymnIntro',label:'Closing Hymn Introduction',rows:2, tokens:'{CALLOUT} = where hymn box appears' },
+  { section:'Closing', key:'benedictionIntro',label:'Benediction Line',         rows:2, tokens:'{benediction} — blank line printed if name not entered' },
+
+  // ── Fast & Testimony ──────────────────────────────────────
+  { section:'Fast & Testimony', key:'fastTestimonyOpen', label:'Personal Testimony Opening', rows:3, tokens:'No tokens' },
+  { section:'Fast & Testimony', key:'fastPulpitOpen',    label:'Open the Pulpit',            rows:2, tokens:'No tokens' },
+];
+
+let CONFIG = {};
+
+// Module-level PAUSE HTML — always available as {PAUSE} token in any phrase
+const PAUSE_HTML = '<span class="pause-mark">pause</span>';
+
+function loadConfig() {
+  try {
+    const saved = localStorage.getItem('sacConfig_v3');
+    if (saved) Object.assign(CONFIG, JSON.parse(saved));
+  } catch(e) { console.warn('Config load error:', e); }
+}
+
+function saveConfig() {
+  try { localStorage.setItem('sacConfig_v3', JSON.stringify(CONFIG)); } catch(e) {}
+}
+
+function ph(key, tokens = {}) {
+  let text = (CONFIG[key] !== undefined ? CONFIG[key] : DEFAULT_PHRASES[key]) || '';
+  // PAUSE is always available; caller tokens override if needed
+  const allTokens = { PAUSE: PAUSE_HTML, ...tokens };
+  for (const [k, v] of Object.entries(allTokens)) {
+    text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), v != null ? v : '');
+  }
+  return text;
+}
+
+/* ── Config Tab UI ───────────────────────────────────────────── */
+function renderConfigTab() {
+  const container = document.getElementById('configPhrases');
+  let html = '';
+  let currentSection = '';
+  PHRASE_CONFIG.forEach(def => {
+    if (def.section !== currentSection) {
+      currentSection = def.section;
+      html += `<div class="config-section-divider">${def.section}</div>`;
+    }
+    const val = CONFIG[def.key] !== undefined ? CONFIG[def.key] : DEFAULT_PHRASES[def.key];
+    html += `<div class="config-phrase-item">
+      <div class="config-phrase-header">
+        <span class="config-phrase-label">${def.label}</span>
+        <button class="btn btn-secondary btn-sm" onclick="resetPhrase('${def.key}')">Reset</button>
+      </div>
+      <div class="config-tokens">tokens: ${def.tokens}</div>
+      <textarea class="config-textarea" id="cfg-${def.key}" rows="${def.rows}" onblur="savePhrase('${def.key}')">${escHtml(val)}</textarea>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function savePhrase(key) {
+  const el = document.getElementById(`cfg-${key}`);
+  if (!el) return;
+  CONFIG[key] = el.value;
+  saveConfig();
+  showSavedIndicator();
+}
+
+function resetPhrase(key) {
+  CONFIG[key] = DEFAULT_PHRASES[key];
+  const el = document.getElementById(`cfg-${key}`);
+  if (el) el.value = DEFAULT_PHRASES[key];
+  saveConfig();
+  showSavedIndicator();
+}
+
+function resetAllConfig() {
+  if (!confirm('Reset all phrases to defaults?')) return;
+  Object.keys(DEFAULT_PHRASES).forEach(k => { CONFIG[k] = DEFAULT_PHRASES[k]; });
+  saveConfig();
+  renderConfigTab();
+  showSavedIndicator();
+}
+
+function exportConfig() {
+  const blob = new Blob([JSON.stringify(CONFIG, null, 2)], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'sacrament_config.json';
+  a.click();
+}
+
+function importConfig() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        Object.assign(CONFIG, parsed);
+        saveConfig();
+        renderConfigTab();
+        showSavedIndicator();
+      } catch(err) { alert('Invalid config file. Make sure it is a JSON file exported from this app.'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function showSavedIndicator() {
+  const el = document.getElementById('configSaved');
+  if (!el) return;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Tab Switching ───────────────────────────────────────────── */
+function switchTab(tab) {
+  document.getElementById('app').style.display       = tab === 'builder' ? '' : 'none';
+  document.getElementById('configTab').style.display = tab === 'config'  ? '' : 'none';
+  document.getElementById('tbBuilder').classList.toggle('active', tab === 'builder');
+  document.getElementById('tbConfig').classList.toggle('active',  tab === 'config');
+  if (tab === 'config') renderConfigTab();
+}
+
+/* ── State ─────────────────────────────────────────────────── */
+let visitors      = [];
+let programItems  = [];
+let announcements = [];
+let activeBiz     = {};
+
+/* ── Init ──────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  loadConfig();
+
+  const today = new Date();
+  const diff  = today.getDay() === 0 ? 0 : 7 - today.getDay();
+  today.setDate(today.getDate() + diff);
+  document.getElementById('meetingDate').value = today.toISOString().split('T')[0];
+
+  ['stake','releases','sustainings','letters','newrecords','blessing','apnew','apadv','childbapt','convertbapt']
+    .forEach(k => { activeBiz[k] = false; });
+
+  addAnnouncement();
+});
+
+/* ── Fast Sunday ─────────────────────────────────────────────── */
+function onFastSundayChange() {
+  const fs = document.getElementById('fastSunday').checked;
+  document.getElementById('fastSundayBanner').classList.toggle('show', fs);
+  const btn = document.getElementById('addSpeakerBtn');
+  btn.style.opacity = fs ? '.4' : '';
+  btn.title = fs ? 'No assigned speakers on Fast Sunday' : '';
+}
+
+/* ── Announcements ───────────────────────────────────────────── */
+function addAnnouncement() {
+  const id  = Date.now();
+  announcements.push(id);
+  const container = document.getElementById('announcementList');
+  const row = document.createElement('div');
+  row.className = 'form-row'; row.id = `ann-${id}`;
+  row.innerHTML = `
+    <div class="form-group">
+      <input type="text" placeholder="Announcement text..." id="ann-text-${id}">
+    </div>
+    <div style="flex:0 0 auto;display:flex;align-items:flex-end;padding-bottom:1px">
+      <button class="btn btn-icon btn-danger" onclick="document.getElementById('ann-${id}').remove();announcements=announcements.filter(a=>a!==${id})">✕</button>
+    </div>`;
+  container.appendChild(row);
+}
+
+/* ── Business Toggles ────────────────────────────────────────── */
+function toggleBusiness(key) {
+  activeBiz[key] = !activeBiz[key];
+  document.getElementById(`bi-${key}`).classList.toggle('active', activeBiz[key]);
+  document.getElementById(`bc-${key}`).textContent = activeBiz[key] ? '✓' : '';
+}
+
+/* ── Brother/Sister Toggle ───────────────────────────────────── */
+function setBs(btn, val, containerId) {
+  const c = document.getElementById(containerId);
+  c.dataset.val = val;
+  c.querySelectorAll('.bs-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+function getBs(containerId) {
+  return document.getElementById(containerId)?.dataset.val || 'Brother';
+}
+function bsToggleHtml(id) {
+  return `<div class="bs-toggle" id="bs-${id}" data-val="Brother">
+    <button type="button" class="bs-btn active" onclick="setBs(this,'Brother','bs-${id}')">Bro</button>
+    <button type="button" class="bs-btn"        onclick="setBs(this,'Sister','bs-${id}')">Sis</button>
+  </div>`;
+}
+function bsPronouns(bs) {
+  if (bs === 'Sister') return { subj:'she', obj:'her', poss:'her', title:'Sister' };
+  return { subj:'he', obj:'him', poss:'his', title:'Brother' };
+}
+
+/* ── Dynamic Rows ────────────────────────────────────────────── */
+function addPersonRow(tableId, extraCol) {
+  const tbody = document.querySelector(`#${tableId}-table tbody`);
+  const id = Date.now();
+  const tr = document.createElement('tr'); tr.id = `row-${id}`;
+  let extraTd = '';
+  if (extraCol === 'calling') extraTd = `<td><input type="text" placeholder="Calling" id="col-${id}"></td>`;
+  else if (extraCol === 'date') extraTd = `<td><input type="text" placeholder="Date" id="col-${id}"></td>`;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Full name" id="name-${id}"></td>
+    <td style="width:80px">${bsToggleHtml(id)}</td>
+    ${extraTd}
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addBlessingRow() {
+  const tbody = document.querySelector('#blessing-table tbody');
+  const id = Date.now();
+  const tr = document.createElement('tr'); tr.id = `row-${id}`;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Child's full name" id="child-${id}"></td>
+    <td><input type="text" placeholder="Father's name / who is blessing" id="blesser-${id}"></td>
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addApRow() {
+  const tbody = document.querySelector('#apnew-table tbody');
+  const id = Date.now();
+  const tr = document.createElement('tr'); tr.id = `row-${id}`;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Full name" id="ap-name-${id}"></td>
+    <td style="width:120px">
+      <select id="ap-office-${id}">
+        <option value="Deacon">Deacon</option>
+        <option value="Teacher">Teacher</option>
+        <option value="Priest">Priest</option>
+      </select>
+    </td>
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addAdvRow() {
+  const tbody = document.querySelector('#apadv-table tbody');
+  const id = Date.now();
+  const tr = document.createElement('tr'); tr.id = `row-${id}`;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Full name" id="adv-name-${id}"></td>
+    <td style="width:120px">
+      <select id="adv-office-${id}">
+        <option value="Teacher">Teacher</option>
+        <option value="Priest">Priest</option>
+      </select>
+    </td>
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addChildBaptRow() {
+  const tbody = document.querySelector('#childbapt-table tbody');
+  const id = Date.now();
+  const tr = document.createElement('tr'); tr.id = `row-${id}`;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Child's name" id="cb-name-${id}"></td>
+    <td style="width:80px">${bsToggleHtml(id)}</td>
+    <td><input type="text" placeholder="Date" id="cb-date-${id}"></td>
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function addConvertBaptRow() {
+  const tbody = document.querySelector('#convertbapt-table tbody');
+  const id = Date.now();
+  const tr = document.createElement('tr'); tr.id = `row-${id}`;
+  tr.innerHTML = `
+    <td><input type="text" placeholder="Full name" id="cvt-name-${id}"></td>
+    <td style="width:80px">${bsToggleHtml(id)}</td>
+    <td><input type="text" placeholder="Date baptized" id="cvt-date-${id}"></td>
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+
+function readPersonRows(tableId, hasCallingCol) {
+  const rows = document.querySelectorAll(`#${tableId}-table tbody tr`);
+  const out  = [];
+  rows.forEach(r => {
+    const id  = r.id.replace('row-','');
+    const nm  = (document.getElementById(`name-${id}`)?.value || '').trim();
+    const bs  = getBs(`bs-${id}`);          // toggle container id is bs-{timestamp}
+    const col = hasCallingCol ? (document.getElementById(`col-${id}`)?.value || '').trim() : '';
+    out.push({ nm, bs, col });
+  });
+  return out;
+}
+
+/* ── Program Builder ─────────────────────────────────────────── */
+function addProgramItem(type) {
+  if (type === 'speaker' && document.getElementById('fastSunday').checked) {
+    if (!confirm('Fast Sunday typically has no assigned speakers. Add one anyway?')) return;
+  }
+  const id = 'pi-' + Date.now();
+  programItems.push({ id, type });
+  document.getElementById('programEmpty')?.remove();
+  const list = document.getElementById('programList');
+  const div  = document.createElement('div');
+  div.id = id; div.className = `program-item ${type}`; div.draggable = true;
+  div.innerHTML = type === 'speaker'
+    ? `<div class="drag-handle">${dots()}</div>
+       <div class="program-item-icon">🎤</div>
+       <span class="item-type-label">Speaker</span>
+       <div class="item-fields">
+         <input type="text" placeholder="Speaker name" id="pi-name-${id}">
+         <input type="text" placeholder="Topic (optional)" id="pi-topic-${id}" style="flex:1.5">
+       </div>
+       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
+    : type === 'hymn'
+    ? `<div class="drag-handle">${dots()}</div>
+       <div class="program-item-icon">🎵</div>
+       <span class="item-type-label">Hymn</span>
+       <div class="item-fields">
+         <input type="text" placeholder="#" class="hymn-num" id="pi-hnum-${id}">
+         <input type="text" placeholder="Hymn title" id="pi-htitle-${id}" style="flex:2">
+       </div>
+       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
+    : /* break */
+      `<div class="drag-handle">${dots()}</div>
+       <span class="break-label">⏸ Conduction Break — you stand here</span>
+       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`;
+  list.appendChild(div);
+  setupDrag(div);
+  updateProgramBadge();
+}
+
+function dots() {
+  return `<div class="drag-row"><span class="drag-dot"></span><span class="drag-dot"></span></div>
+          <div class="drag-row"><span class="drag-dot"></span><span class="drag-dot"></span></div>
+          <div class="drag-row"><span class="drag-dot"></span><span class="drag-dot"></span></div>`;
+}
+
+function removeProgramItem(id) {
+  document.getElementById(id)?.remove();
+  programItems = programItems.filter(p => p.id !== id);
+  if (!document.querySelector('.program-item')) {
+    const e = document.createElement('div');
+    e.id = 'programEmpty'; e.className = 'empty-state';
+    e.textContent = 'No program items yet.';
+    document.getElementById('programList').appendChild(e);
+  }
+  updateProgramBadge();
+}
+
+function updateProgramBadge() {
+  const b = document.getElementById('programBadge');
+  const n = programItems.length;
+  b.textContent = n > 0 ? `${n} item${n>1?'s':''}` : '';
+  b.style.display = n > 0 ? '' : 'none';
+}
+
+/* ── Drag & Drop ─────────────────────────────────────────────── */
+let dragSrc = null;
+function setupDrag(el) {
+  el.addEventListener('dragstart', () => { dragSrc = el; setTimeout(() => el.classList.add('dragging'), 0); });
+  el.addEventListener('dragend',   () => { el.classList.remove('dragging'); document.querySelectorAll('.program-item').forEach(i => i.classList.remove('drag-over')); dragSrc = null; });
+  el.addEventListener('dragover',  e => { e.preventDefault(); });
+  el.addEventListener('dragenter', e => { e.preventDefault(); if (el !== dragSrc) el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    if (dragSrc && dragSrc !== el) {
+      const list  = document.getElementById('programList');
+      const items = [...list.querySelectorAll('.program-item')];
+      if (items.indexOf(dragSrc) < items.indexOf(el)) list.insertBefore(dragSrc, el.nextSibling);
+      else list.insertBefore(dragSrc, el);
+    }
+    el.classList.remove('drag-over');
+  });
+}
+
+/* ── Visitor Modal ───────────────────────────────────────────── */
+const CALLING_INFO = {
+  apostle:             { recognize:true,          presides:true,  desc:'Apostle, Quorum of the Twelve' },
+  firstpresidency:     { recognize:true,          presides:true,  desc:'First Presidency' },
+  presidency70:        { recognize:true,          presides:true,  desc:'Presidency of the Seventy' },
+  firstq70:            { recognize:true,          presides:true,  desc:'First/Second Quorum of Seventy' },
+  presidingbishopric:  { recognize:true,          presides:true,  desc:'Presiding Bishopric' },
+  area70:              { recognize:true,          presides:true,  desc:'Area Seventy' },
+  missionpres:         { recognize:true,          presides:false, desc:'Mission President' },
+  stakepres:           { recognize:true,          presides:true,  desc:'Stake President' },
+  'stakepres-counselor':{ recognize:true,         presides:true,  desc:'Counselor in Stake Presidency' },
+  highcouncilor:       { recognize:'ask',         presides:false, desc:'High Councilor' },
+  templepres:          { recognize:true,          presides:false, desc:'Temple President' },
+  templematron:        { recognize:true,          presides:false, desc:'Temple Matron' },
+  genrs:               { recognize:'homeward',    presides:false, desc:'General Relief Society Presidency' },
+  genyw:               { recognize:'homeward',    presides:false, desc:'General Young Women Presidency' },
+  genprimary:          { recognize:'homeward',    presides:false, desc:'General Primary Presidency' },
+  genss:               { recognize:'homeward',    presides:false, desc:'General Sunday School Presidency' },
+};
+
+function openVisitorModal() {
+  document.getElementById('visitorModal').classList.add('show');
+  document.getElementById('visitorCalling').value = '';
+  document.getElementById('visitorGuidance').classList.add('hidden');
+  document.getElementById('visitorNameSection').classList.add('hidden');
+  document.getElementById('hcQuestion').classList.add('hidden');
+  document.getElementById('goQuestion').classList.add('hidden');
+  document.getElementById('addVisitorBtn').disabled = true;
+  document.getElementById('visitorName').value = '';
+  document.querySelectorAll('input[name=hcAssignment]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name=goHomeWard]').forEach(r => r.checked = false);
+}
+function closeVisitorModal() { document.getElementById('visitorModal').classList.remove('show'); }
+
+function onCallingChange() {
+  const val = document.getElementById('visitorCalling').value;
+  if (!val) { document.getElementById('visitorGuidance').classList.add('hidden'); return; }
+  const info = CALLING_INFO[val];
+  document.getElementById('hcQuestion').classList.toggle('hidden', val !== 'highcouncilor');
+  document.getElementById('goQuestion').classList.toggle('hidden', info.recognize !== 'homeward');
+  document.querySelectorAll('input[name=hcAssignment]').forEach(r => r.checked = false);
+  document.querySelectorAll('input[name=goHomeWard]').forEach(r => r.checked = false);
+  document.getElementById('visitorNameSection').classList.add('hidden');
+  document.getElementById('addVisitorBtn').disabled = true;
+
+  if (val === 'highcouncilor') {
+    showGuidance('info', '❓ High Councilor — Confirm Assignment',
+      'High councilors are formally recognized and invited to sit on the stand <strong>when attending on official assignment</strong>. If attending informally, they sit with their family and no announcement is needed.');
+  } else if (info.recognize === 'homeward') {
+    showGuidance('info', '🏠 General Officer — Home Ward?',
+      'General Officers are recognized and invited to sit on the stand <em>unless they are attending their home ward</em> (Handbook §29.2.1.1).');
+  } else {
+    showRecognized(info);
+  }
+}
+
+function onHcChange() {
+  const val = document.querySelector('input[name=hcAssignment]:checked')?.value;
+  if (val === 'yes') showRecognized(CALLING_INFO['highcouncilor'], true);
+  else if (val === 'no') {
+    showGuidance('no-recog', '🟡 No Formal Recognition Needed',
+      'This high councilor is attending informally — no announcement is needed. He may sit with his family.');
+    document.getElementById('visitorNameSection').classList.remove('hidden');
+    document.getElementById('addVisitorBtn').disabled = false;
+  }
+}
+
+function onGoChange() {
+  const val  = document.querySelector('input[name=goHomeWard]:checked')?.value;
+  const info = CALLING_INFO[document.getElementById('visitorCalling').value];
+  if (val === 'no') showRecognized(info);
+  else {
+    showGuidance('no-recog', '🟡 No Formal Recognition Needed',
+      'When General Officers attend their home ward, no formal introduction is made.');
+    document.getElementById('visitorNameSection').classList.remove('hidden');
+    document.getElementById('addVisitorBtn').disabled = false;
+  }
+}
+
+function showRecognized(info, isHc = false) {
+  const msg = info.presides
+    ? `<strong>✅ This person PRESIDES and is recognized.</strong> Invite them to sit on the stand and consult with them before the meeting.`
+    : isHc
+      ? `<strong>✅ Recognized — On Assignment.</strong> Invite this high councilor to sit on the stand and introduce him.`
+      : `<strong>✅ Recognized.</strong> Invite this person to sit on the stand and introduce them during your opening remarks.`;
+  showGuidance('success', '', msg);
+  document.getElementById('visitorNameSection').classList.remove('hidden');
+  document.getElementById('addVisitorBtn').disabled = false;
+}
+
+function showGuidance(type, title, text) {
+  const box = document.getElementById('visitorGuidance');
+  box.className = `guidance-box ${type}`;
+  box.innerHTML  = (title ? `<strong>${title}</strong>` : '') + text;
+  box.classList.remove('hidden');
+}
+
+function addVisitor() {
+  const callingVal = document.getElementById('visitorCalling').value;
+  if (!callingVal) return;
+  const info  = CALLING_INFO[callingVal];
+  const name  = document.getElementById('visitorName').value.trim();
+  const hcAns = document.querySelector('input[name=hcAssignment]:checked')?.value;
+  const goAns = document.querySelector('input[name=goHomeWard]:checked')?.value;
+
+  let recognized = false;
+  if (callingVal === 'highcouncilor')    recognized = hcAns === 'yes';
+  else if (info.recognize === 'homeward') recognized = goAns === 'no';
+  else recognized = info.recognize === true;
+
+  const v = { id: Date.now(), callingVal, info, name, recognized, hcOnAssignment: hcAns === 'yes' };
+  visitors.push(v);
+  renderVisitorItem(v);
+  updateVisitorBadge();
+  closeVisitorModal();
+}
+
+function renderVisitorItem(v) {
+  const list = document.getElementById('visitorList');
+  document.getElementById('visitorEmpty')?.remove();
+  const div = document.createElement('div');
+  div.id = `vis-${v.id}`;
+  div.className = `visitor-item ${v.recognized ? 'recognized' : 'not-recognized'}`;
+  const displayName = v.name || '(name not entered)';
+  const scriptHint  = v.recognized ? `📢 "${buildVisitorLine(v)}"` : '⚠ No formal recognition needed';
+  div.innerHTML = `
+    <div class="visitor-info">
+      <div class="visitor-name">${displayName}</div>
+      <div class="visitor-calling">${v.info.desc}${v.hcOnAssignment ? ' — on assignment' : ''}</div>
+      <div class="visitor-script" style="color:${v.recognized?'var(--blue)':'#92400e'}">${scriptHint}</div>
+    </div>
+    <span class="visitor-badge ${v.recognized ? 'recognized' : 'not-recognized'}">${v.recognized ? 'RECOGNIZED' : 'NOT RECOGNIZED'}</span>
+    <button class="btn btn-icon btn-danger btn-sm" onclick="removeVisitor(${v.id})">✕</button>`;
+  list.appendChild(div);
+}
+
+function buildVisitorLine(v) {
+  const name = v.name || '[Name]';
+  if (v.info.presides)  return ph('visitorPresides',       { name });
+  if (v.hcOnAssignment) return ph('visitorRecognizeHC',    { name });
+  return                       ph('visitorRecognizeStand', { name, desc: v.info.desc });
+}
+
+function removeVisitor(id) {
+  visitors = visitors.filter(v => v.id !== id);
+  document.getElementById(`vis-${id}`)?.remove();
+  if (!visitors.length) {
+    const e = document.createElement('div');
+    e.id = 'visitorEmpty'; e.className = 'empty-state';
+    e.textContent = 'No visitors added.';
+    document.getElementById('visitorList').appendChild(e);
+  }
+  updateVisitorBadge();
+}
+
+function updateVisitorBadge() {
+  const b = document.getElementById('visitorBadge');
+  const n = visitors.length;
+  b.textContent = n > 0 ? `${n} visitor${n>1?'s':''}` : '';
+  b.style.display = n > 0 ? '' : 'none';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SCRIPT GENERATION
+══════════════════════════════════════════════════════════════ */
+function generateScript() {
+  const ward       = g('wardName') || 'Seguin 1st Ward';
+  const dateStr    = formatDate(g('meetingDate'));
+  const presiding  = g('presidingName');
+  const conducting = g('conductingName');
+  const chorister  = g('chorister');
+  const organist   = g('organist');
+  const fastSunday = document.getElementById('fastSunday').checked;
+  const invocation = g('invocation');
+  const benediction= g('benediction');
+  const openNum    = g('openingHymnNum');
+  const openTitle  = g('openingHymnTitle');
+  const sacNum     = g('sacHymnNum');
+  const sacTitle   = g('sacHymnTitle');
+  const closingNum = g('closingHymnNum');
+  const closingTitle=g('closingHymnTitle');
+
+  let html = '';
+
+  /* -- Header ------------------------------------------------ */
+  html += `<div class="script-meeting-header">
+    <div class="ward-name">${ward}</div>
+    <div class="meeting-type">${fastSunday ? '🌙 Fast &amp; Testimony Meeting' : 'Sacrament Meeting'}</div>
+    <div class="meta-row">
+      <span>📅 ${dateStr}</span>
+      <span>🕊 Presiding: <strong>${presiding || '___'}</strong></span>
+      <span>📋 Conducting: <strong>${conducting || '___'}</strong></span>
+    </div>
+  </div>`;
+
+  /* -- WELCOME ---------------------------------------------- */
+  const recogVisitors = visitors.filter(v => v.recognized);
+  const presidingVis  = recogVisitors.find(v => v.info.presides);
+  // Everyone recognized except the one who is THE presider — all sit on the stand
+  const standVisitors = recogVisitors.filter(v => v !== presidingVis);
+
+  // Presiding line
+  let presidingLine = '';
+  if (presidingVis) {
+    presidingLine = ph('visitorPresides', { name: presidingVis.name || '[Name]' });
+  } else {
+    presidingLine = `${presiding || '[Presiding]'} will be Presiding.`;
+  }
+
+  // Visitor stand lines (using configurable phrases)
+  let visitorLines = '';
+  if (standVisitors.length === 1) {
+    const sv = standVisitors[0];
+    const svName = sv.name || '[Name]';
+    const line = sv.hcOnAssignment
+      ? ph('visitorRecognizeHC',    { name: svName })
+      : ph('visitorRecognizeStand', { name: svName, desc: sv.info.desc });
+    visitorLines = '\n\n' + line;
+  } else if (standVisitors.length > 1) {
+    const list = standVisitors.map(sv => {
+      const n = sv.name || '[Name]';
+      return sv.hcOnAssignment ? `${n} (High Councilor, on assignment)` : `${n}, ${sv.info.desc}`;
+    }).join('; ');
+    visitorLines = '\n\n' + ph('visitorRecognizeMulti', { list });
+  }
+
+  html += secHead('Welcome');
+  html += say(ph('welcome', { conducting: conducting || '[Conducting]', ward, presidingLine }) + visitorLines);
+
+  /* -- ANNOUNCEMENTS ---------------------------------------- */
+  const annTexts = announcements
+    .map(id => (document.getElementById(`ann-text-${id}`)?.value || '').trim())
+    .filter(Boolean);
+  if (annTexts.length) {
+    html += secHead('Announcements');
+    const count = annTexts.length === 1 ? 'one' : annTexts.length === 2 ? 'two' : 'several';
+    const s     = annTexts.length === 1 ? '' : 's';
+    html += say(ph('announcementIntro', { count, s }));
+    html += say(annTexts.map((a,i) => `${i+1}. ${a}`).join('\n'));
+  }
+
+  /* -- OPENING HYMN & INVOCATION ---------------------------- */
+  html += secHead('Opening Hymn');
+  html += hymnSection('openingHymnIntro', 'Opening Hymn', openNum, openTitle);
+  html += say(ph('invocationIntro', { invocation: invocation || BLANK }));
+
+  /* -- STAKE BUSINESS (own section) ------------------------- */
+  if (activeBiz.stake) {
+    html += secHead('Stake Business');
+    const by = g('stake-conductor');
+    html += say(ph('stakeBusiness', { by: by || '[Name]' }));
+  }
+
+  /* -- WARD BUSINESS ---------------------------------------- */
+  const wardBizKeys = ['releases','sustainings','letters','newrecords','blessing','apnew','apadv','childbapt','convertbapt'];
+  const hasWardBiz  = wardBizKeys.some(k => activeBiz[k]);
+  if (hasWardBiz) {
+    html += secHead('Ward Business');
+
+    // Releases — vote of thanks only, NO opposed vote
+    if (activeBiz.releases) {
+      const rows = readPersonRows('releases', true).filter(r => r.nm);
+      if (rows.length === 1) {
+        const { nm, bs, col } = rows[0];
+        const p = bsPronouns(bs);
+        html += say(ph('releaseSingle', { title:p.title, name:nm, poss:p.poss, calling:col||'[Calling]', subj:p.subj }));
+      } else if (rows.length > 1) {
+        const list = rows.map(r => {
+          const p = bsPronouns(r.bs);
+          return `${p.title} ${r.nm} has been released from ${p.poss} calling as ${r.col || '[Calling]'}.`;
+        }).join('\n');
+        html += say(ph('releaseMulti', { list }));
+      }
+    }
+
+    // Sustainings — includes opposed vote, full sentences
+    if (activeBiz.sustainings) {
+      const rows = readPersonRows('sustainings', true).filter(r => r.nm);
+      if (rows.length === 1) {
+        const { nm, bs, col } = rows[0];
+        const p   = bsPronouns(bs);
+        const art = /^[aeiou]/i.test(col || '') ? 'an' : 'a';
+        html += say(ph('sustainSingle', { title:p.title, name:nm, art, calling:col||'[Calling]', subj:p.subj }));
+      } else if (rows.length > 1) {
+        const list = rows.map(r => {
+          const p   = bsPronouns(r.bs);
+          const art = /^[aeiou]/i.test(r.col || '') ? 'an' : 'a';
+          return `${p.title} ${r.nm} has been called as ${art} ${r.col || '[Calling]'}.`;
+        }).join('\n');
+        html += say(ph('sustainMulti', { list }));
+      }
+    }
+
+    // Letters from HQ
+    if (activeBiz.letters) {
+      html += say(ph('lettersLine'));
+      const det = g('letters-details');
+      if (det) html += `<div class="script-letter-box">${escHtml(det)}</div>`;
+    }
+
+    // New Member Records
+    if (activeBiz.newrecords) {
+      const rows = readPersonRows('newrecords', false).filter(r => r.nm);
+      if (rows.length === 1) {
+        const { nm, bs } = rows[0];
+        const p = bsPronouns(bs);
+        html += say(ph('newRecordSingle', { title:p.title, name:nm, obj:p.obj }));
+      } else if (rows.length > 1) {
+        const list = rows.map(r => `${bsPronouns(r.bs).title} ${r.nm}`).join('\n');
+        html += say(ph('newRecordMulti', { list }));
+      }
+    }
+
+    // Aaronic Priesthood — New Ordination (grouped if multiple)
+    if (activeBiz.apnew) {
+      const apRows = [];
+      document.querySelectorAll('#apnew-table tbody tr').forEach(r => {
+        const id  = r.id.replace('row-','');
+        const nm  = (document.getElementById(`ap-name-${id}`)?.value || '').trim();
+        if (!nm) return;
+        const off = document.getElementById(`ap-office-${id}`)?.value || 'Deacon';
+        apRows.push({ nm, off });
+      });
+      if (apRows.length === 1) {
+        const { nm, off } = apRows[0];
+        html += say(off === 'Deacon' ? ph('apDeacon', { name:nm }) : ph('apOrdination', { name:nm, office:off }));
+      } else if (apRows.length > 1) {
+        const list = apRows.map(({ nm, off }) =>
+          off === 'Deacon' ? `${nm} — to receive the Aaronic Priesthood and be ordained a Deacon`
+                           : `${nm} — to be ordained a ${off}`
+        ).join('\n');
+        html += say(ph('apOrdMulti', { list }));
+      }
+    }
+
+    // Aaronic Priesthood — Advancement (grouped if multiple)
+    if (activeBiz.apadv) {
+      const advRows = [];
+      document.querySelectorAll('#apadv-table tbody tr').forEach(r => {
+        const id  = r.id.replace('row-','');
+        const nm  = (document.getElementById(`adv-name-${id}`)?.value || '').trim();
+        if (!nm) return;
+        const off = document.getElementById(`adv-office-${id}`)?.value || 'Teacher';
+        advRows.push({ nm, off });
+      });
+      if (advRows.length === 1) {
+        const { nm, off } = advRows[0];
+        html += say(ph('apAdvancement', { name:nm, office:off }));
+      } else if (advRows.length > 1) {
+        const list = advRows.map(({ nm, off }) => `${nm} — to be ordained a ${off}`).join('\n');
+        html += say(ph('apAdvMulti', { list }));
+      }
+    }
+
+    // Child of Record Baptism — recognized, no welcome vote
+    if (activeBiz.childbapt) {
+      const cbRows = [];
+      document.querySelectorAll('#childbapt-table tbody tr').forEach(r => {
+        const id  = r.id.replace('row-','');
+        const nm  = (document.getElementById(`cb-name-${id}`)?.value || '').trim();
+        if (!nm) return;
+        const bs      = getBs(`bs-${id}`);
+        const p       = bsPronouns(bs);
+        const dt      = (document.getElementById(`cb-date-${id}`)?.value || '').trim();
+        const dateStr = getDayPhrase(dt, g('meetingDate'));
+        cbRows.push({ nm, p, dateStr });
+      });
+      if (cbRows.length === 1) {
+        const { nm, p, dateStr } = cbRows[0];
+        html += say(ph('childBapt', { title:p.title, name:nm, dateStr, obj:p.obj, poss:p.poss }));
+      } else if (cbRows.length > 1) {
+        const list = cbRows.map(({ nm, p, dateStr }) => `${p.title} ${nm}${dateStr}`).join('\n');
+        html += say(ph('childBaptMulti', { list }));
+      }
+    }
+
+    // Convert Baptism — all welcomed together by vote
+    if (activeBiz.convertbapt) {
+      const cvtRows = [];
+      document.querySelectorAll('#convertbapt-table tbody tr').forEach(r => {
+        const id  = r.id.replace('row-','');
+        const nm  = (document.getElementById(`cvt-name-${id}`)?.value || '').trim();
+        if (!nm) return;
+        const bs      = getBs(`bs-${id}`);
+        const p       = bsPronouns(bs);
+        const dt      = (document.getElementById(`cvt-date-${id}`)?.value || '').trim();
+        const dateStr = getDayPhrase(dt, g('meetingDate'));
+        cvtRows.push({ nm, p, dateStr });
+      });
+      if (cvtRows.length === 1) {
+        const { nm, p, dateStr } = cvtRows[0];
+        html += say(ph('convertBapt', { title:p.title, name:nm, dateStr }));
+      } else if (cvtRows.length > 1) {
+        const list = cvtRows.map(({ nm, p, dateStr }) => `${p.title} ${nm}${dateStr}`).join('\n');
+        html += say(ph('convertBaptMulti', { list }));
+      }
+    }
+
+    // Baby Blessings
+    if (activeBiz.blessing) {
+      document.querySelectorAll('#blessing-table tbody tr').forEach(r => {
+        const id      = r.id.replace('row-','');
+        const child   = (document.getElementById(`child-${id}`)?.value || '').trim();
+        if (!child) return;
+        const blesser = (document.getElementById(`blesser-${id}`)?.value || '').trim() || '[Name]';
+        html += say(ph('babyBlessing', { child, blesser }));
+      });
+    }
+  }
+
+  /* -- SACRAMENT HYMN --------------------------------------- */
+  html += secHead('Sacrament Hymn');
+  html += hymnSection('sacHymnIntro', 'Sacrament Hymn', sacNum, sacTitle);
+
+  /* -- SACRAMENT -------------------------------------------- */
+  html += `<div class="script-sacrament-break">
+    <div class="sac-title">✦ &nbsp; S A C R A M E N T &nbsp; ✦</div>
+    <div class="sac-sub">Administration of the sacrament</div>
+  </div>`;
+
+  /* -- AFTER SACRAMENT -------------------------------------- */
+  html += say(ph('afterSacrament'));
+
+  /* -- PROGRAM --------------------------------------------- */
+  const piDoms = [...document.querySelectorAll('.program-item')];
+  if (fastSunday) {
+    html += secHead('Fast & Testimony Meeting');
+    html += `<div class="script-fast-block">Bear a brief personal testimony, then open the pulpit to the congregation. Keep testimonies moving. Close as the hour approaches.</div>`;
+    html += say(ph('fastTestimonyOpen'));
+    html += say(ph('fastPulpitOpen'));
+  } else if (piDoms.length) {
+    html += secHead('Program');
+    const ordinals = ['first','second','third','fourth','fifth','sixth','seventh','eighth'];
+
+    // Pre-identify the last filled speaker (gets "concluding" label)
+    const filledSpeakerEls = piDoms.filter(el =>
+      el.classList.contains('speaker') &&
+      (document.getElementById(`pi-name-${el.id}`)?.value || '').trim()
+    );
+    const lastSpeakerEl = filledSpeakerEls[filledSpeakerEls.length - 1] || null;
+
+    // Does any break exist in the program? Determines whether to use "now"/"then" at all.
+    const hasBreaks = piDoms.some(el => el.classList.contains('break'));
+
+    let speakerCount = 0;
+    let prevWasBreak = false; // true when the immediately preceding rendered item was a break
+
+    piDoms.forEach(el => {
+      if (el.classList.contains('break')) {
+        prevWasBreak = true;
+        html += `<div class="script-conduct-break">⏸ &nbsp; Conduction Break — you stand here</div>`;
+        return;
+      }
+
+      // Determine tense: ' now' if immediately after a break, ' then' if a break exists elsewhere,
+      // '' if no breaks in the program at all (includes leading space for clean token substitution)
+      const tense = prevWasBreak ? ' now' : hasBreaks ? ' then' : '';
+      prevWasBreak = false; // reset after consuming
+
+      if (el.classList.contains('speaker')) {
+        const name  = (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
+        if (!name) return; // skip empty speakers
+        const topic = (document.getElementById(`pi-topic-${el.id}`)?.value || '').trim();
+        const isLast = el === lastSpeakerEl;
+        const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
+        speakerCount++;
+        html += say(ph(topic ? 'speakerIntroWithTopic' : 'speakerIntro', { ordinal, name, topic }));
+      } else if (el.classList.contains('hymn')) {
+        const hnum   = (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim();
+        const htitle = (document.getElementById(`pi-htitle-${el.id}`)?.value || '').trim();
+        if (!hnum && !htitle) return; // skip empty hymns
+        html += hymnSection('intermediateHymnIntro', 'Intermediate Hymn', hnum, htitle, { tense });
+      }
+    });
+  }
+
+  /* -- CLOSING --------------------------------------------- */
+  html += secHead('Closing');
+
+  // Closing thanks — base phrase + chorister/organist appended
+  let thankLine = ph('closingThanks');
+  const thankParts = [];
+  if (chorister) thankParts.push(`our chorister, ${chorister}`);
+  if (organist)  thankParts.push(`our organist, ${organist}`);
+  if (thankParts.length) {
+    // strip trailing period from base phrase if present, then append
+    thankLine = thankLine.replace(/\.\s*$/, '') + ` We would also like to thank ${thankParts.join(' and ')}.`;
+  }
+  html += say(thankLine);
+
+  html += hymnSection('closingHymnIntro', 'Closing Hymn', closingNum, closingTitle);
+  html += say(ph('benedictionIntro', { benediction: benediction || BLANK }));
+
+  /* -- Render ---------------------------------------------- */
+  document.getElementById('scriptTitle').textContent  = `${ward} · ${dateStr}`;
+  document.getElementById('scriptContent').innerHTML  = html;
+  document.getElementById('scriptView').classList.add('show');
+  window.scrollTo(0,0);
+}
+
+/* ── Script Helpers ──────────────────────────────────────────── */
+
+// A printable blank line for penciling in names on Sunday
+const BLANK = '<span style="display:inline-block;min-width:200px;border-bottom:1.5px solid #aaa">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>';
+
+function secHead(label) {
+  return `<div class="script-sec-head">${label}</div>`;
+}
+
+function say(text) {
+  return `<div class="script-say">${text.replace(/\n/g, '<br>')}</div>`;
+}
+
+function hymnCallout(label, num, title) {
+  return `<div class="script-hymn-callout">
+    <span style="font-size:1.4rem">🎵</span>
+    <div>
+      <span class="hc-label">${label}</span>
+      <span class="hc-text">${num ? '#' + num + ' — ' : ''}${title ? '"' + title + '"' : '<em>not entered</em>'}</span>
+    </div>
+  </div>`;
+}
+
+// Renders a hymn phrase that contains {CALLOUT}.
+// Text before {CALLOUT} → say block. Callout box. Text after → say block.
+// extraTokens: e.g. { tense: ' now' } for conduction-break tense sensitivity.
+function hymnSection(phraseKey, calloutLabel, num, title, extraTokens = {}) {
+  const text  = ph(phraseKey, extraTokens);
+  const parts = text.split('{CALLOUT}');
+  let out = '';
+  if (parts[0].trim()) out += say(parts[0].trim());
+  out += hymnCallout(calloutLabel, num, title);
+  if (parts.length > 1 && parts[1].trim()) out += say(parts[1].trim());
+  return out;
+}
+
+/* ── Utilities ───────────────────────────────────────────────── */
+function g(id) { return (document.getElementById(id)?.value || '').trim(); }
+
+// Given a raw date string and the meeting date, returns " this Thursday", " last Friday",
+// " on [date]", or "" — with a leading space for clean inline embedding.
+function getDayPhrase(rawDate, meetingDateStr) {
+  if (!rawDate) return '';
+  // Parse baptism date; handle YYYY-MM-DD as local time to avoid UTC-offset day shift
+  let bapt;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    const [y,m,d] = rawDate.split('-');
+    bapt = new Date(+y, +m-1, +d);
+  } else {
+    bapt = new Date(rawDate);
+  }
+  if (isNaN(bapt?.getTime())) return ` on ${rawDate}`; // unparseable — use raw string
+
+  // Meeting date (always a Sunday from the date picker)
+  let meet;
+  if (meetingDateStr && /^\d{4}-\d{2}-\d{2}$/.test(meetingDateStr)) {
+    const [y,m,d] = meetingDateStr.split('-');
+    meet = new Date(+y, +m-1, +d);
+  } else {
+    meet = new Date();
+  }
+
+  const diffDays = Math.round((meet - bapt) / 86400000); // positive = baptism was before meeting
+  const dayName  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][bapt.getDay()];
+
+  if (diffDays >= 1 && diffDays <= 7)  return ` this ${dayName}`;
+  if (diffDays >= 8 && diffDays <= 14) return ` last ${dayName}`;
+  return ` on ${rawDate}`; // older or future — fall back to raw date
+}
+
+function formatDate(ds) {
+  if (!ds) return '___';
+  const [y,m,d] = ds.split('-');
+  return new Date(+y, +m-1, +d).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+}
+
+function toggleMobileMode() {
+  const view = document.getElementById('scriptView');
+  const btn  = document.getElementById('mobileToggleBtn');
+  const on   = view.classList.toggle('mobile-mode');
+  btn.style.background = on ? 'var(--gold)' : '';
+  btn.style.color      = on ? 'white'       : '';
+}
+
+function closeScript() {
+  document.getElementById('scriptView').classList.remove('show');
+}
+
+function clearAll() {
+  if (confirm('Reset and start a new meeting?')) location.reload();
+}
+
+/* ── [test mode removed] ─────────────────────────────────────── */
+function fillTestMode_DISABLED() {
+  if (!confirm('Fill the form with sample data? This will replace all current entries.')) return;
+
+  // ── Meeting Details ──────────────────────────────────────
+  document.getElementById('wardName').value        = 'Seguin 1st Ward';
+  document.getElementById('meetingDate').value     = '2026-06-07';  // Sunday
+  document.getElementById('presidingName').value   = 'Bishop Thomas Anderson';
+  document.getElementById('conductingName').value  = 'Brother James Mitchell';
+  document.getElementById('fastSunday').checked    = false;
+  onFastSundayChange();
+
+  // ── Music ────────────────────────────────────────────────
+  document.getElementById('openingHymnNum').value   = '85';
+  document.getElementById('openingHymnTitle').value = 'How Firm a Foundation';
+  document.getElementById('sacHymnNum').value       = '172';
+  document.getElementById('sacHymnTitle').value     = 'In Humility, Our Savior';
+  document.getElementById('closingHymnNum').value   = '217';
+  document.getElementById('closingHymnTitle').value = 'Come, Let Us Anew';
+  document.getElementById('chorister').value        = 'Sister Rebecca Flores';
+  document.getElementById('organist').value         = 'Sister Karen Wells';
+
+  // ── Prayers ──────────────────────────────────────────────
+  document.getElementById('invocation').value  = 'Brother Carlos Rivera';
+  document.getElementById('benediction').value = 'Sister Emily Johnson';
+
+  // ── Visitors ─────────────────────────────────────────────
+  visitors = [];
+  document.getElementById('visitorList').innerHTML = '';
+  // Stake President presides (male), High Councilor on assignment (male) — typical combo
+  [
+    { callingVal:'stakepres',    name:'President Robert Nielson', recognized:true,  hcOnAssignment:false },
+    { callingVal:'highcouncilor',name:'Brother David Park',       recognized:true,  hcOnAssignment:true  },
+  ].forEach((v, i) => {
+    const entry = { ...v, id: Date.now() + i, info: CALLING_INFO[v.callingVal] };
+    visitors.push(entry);
+    renderVisitorItem(entry);
+  });
+  updateVisitorBadge();
+
+  // ── Announcements ─────────────────────────────────────────
+  announcements = [];
+  document.getElementById('announcementList').innerHTML = '';
+  [
+    'Ward temple trip this Saturday at 9 AM — sign up on the bulletin board in the foyer.',
+    'Sisters Book Club meets Tuesday at 7 PM at the Flores home. All are welcome.',
+  ].forEach(text => {
+    addAnnouncement();
+    const id = announcements[announcements.length - 1];
+    document.getElementById(`ann-text-${id}`).value = text;
+  });
+
+  // ── Ward Business ─────────────────────────────────────────
+  // Activate all business items
+  const bizKeys = ['stake','releases','sustainings','letters','newrecords','blessing','apnew','apadv','childbapt','convertbapt'];
+  bizKeys.forEach(k => { if (!activeBiz[k]) toggleBusiness(k); });
+
+  // Clear all dynamic table rows before filling
+  ['releases','sustainings','newrecords','blessing','apnew','apadv','childbapt','convertbapt'].forEach(t => {
+    const tb = document.querySelector(`#${t}-table tbody`);
+    if (tb) tb.innerHTML = '';
+  });
+
+  // Helper: call an add-row function, then set field values on the resulting last row.
+  // Fields keys match the element-id prefix (e.g. 'name' → 'name-{id}').
+  // Pass { _sister: true } to flip the Bro/Sis toggle to Sister.
+  function testRow(addFn, tableId, fields) {
+    addFn();
+    const tbody  = document.querySelector(`#${tableId}-table tbody`);
+    const lastTr = tbody.lastElementChild;
+    const id     = lastTr.id.replace('row-', '');
+    Object.entries(fields).forEach(([k, v]) => {
+      if (k === '_sister') {
+        const sisBtn = document.querySelector(`#bs-${id} .bs-btn:last-child`);
+        if (sisBtn) setBs(sisBtn, 'Sister', `bs-${id}`);
+      } else {
+        const el = document.getElementById(`${k}-${id}`);
+        if (el) el.value = v;
+      }
+    });
+  }
+
+  // Stake Business
+  document.getElementById('stake-conductor').value = 'Brother David Park';
+
+  // Releases — 1 male, 1 female
+  testRow(() => addPersonRow('releases','calling'), 'releases', { name:'James Sullivan',  col:"Elder's Quorum President" });
+  testRow(() => addPersonRow('releases','calling'), 'releases', { name:'Patricia Nguyen', col:'Primary President', _sister:true });
+
+  // Sustainings — 1 male, 1 female
+  testRow(() => addPersonRow('sustainings','calling'), 'sustainings', { name:'Robert Thompson', col:"Elder's Quorum President" });
+  testRow(() => addPersonRow('sustainings','calling'), 'sustainings', { name:'Sandra Lee',      col:'Relief Society President', _sister:true });
+
+  // Letter from HQ
+  document.getElementById('letters-details').value =
+    'Dear Brothers and Sisters,\n\nWe are pleased to announce the upcoming general conference, to be held the first weekend of October. We invite all members to prepare prayerfully.\n\nSincerely,\nThe First Presidency';
+
+  // New Member Records — 1 male, 1 female
+  testRow(() => addPersonRow('newrecords','none'), 'newrecords', { name:'Marcus Williams' });
+  testRow(() => addPersonRow('newrecords','none'), 'newrecords', { name:'Grace Kim', _sister:true });
+
+  // Baby Blessings — 1 male baby, 1 female baby
+  testRow(addBlessingRow, 'blessing', { child:'Oliver James Christensen', blesser:'Michael Christensen' });
+  testRow(addBlessingRow, 'blessing', { child:'Amelia Rose Santos',       blesser:'Daniel Santos' });
+
+  // AP Ordinations — 2 males (Deacon + Teacher) to exercise grouped output
+  testRow(addApRow, 'apnew', { 'ap-name':'Ethan Bradley',   'ap-office':'Deacon'  });
+  testRow(addApRow, 'apnew', { 'ap-name':'Noah Fitzgerald',  'ap-office':'Teacher' });
+
+  // AP Advancement — 2 males (Teacher + Priest) to exercise grouped output
+  testRow(addAdvRow, 'apadv', { 'adv-name':'Liam Cooper',  'adv-office':'Teacher' });
+  testRow(addAdvRow, 'apadv', { 'adv-name':'Jacob Turner', 'adv-office':'Priest'  });
+
+  // Child of Record Baptism — 1 male (this Friday), 1 female (last Saturday) — tests both day phrases
+  testRow(addChildBaptRow, 'childbapt', { 'cb-name':'Tyler Hawkins', 'cb-date':'2026-06-05' });            // Friday before meeting
+  testRow(addChildBaptRow, 'childbapt', { 'cb-name':'Lily Hawkins',  'cb-date':'2026-05-30', _sister:true }); // week prior Saturday
+
+  // Convert Baptism — 1 male, 1 female (both last Saturday — exercises grouped output)
+  testRow(addConvertBaptRow, 'convertbapt', { 'cvt-name':'Benjamin Walsh',  'cvt-date':'2026-05-30' });
+  testRow(addConvertBaptRow, 'convertbapt', { 'cvt-name':'Sophia Martinez', 'cvt-date':'2026-05-30', _sister:true });
+
+  // ── Program Order ─────────────────────────────────────────
+  programItems = [];
+  const progList = document.getElementById('programList');
+  progList.innerHTML = '';
+  const emptyPlaceholder = document.createElement('div');
+  emptyPlaceholder.id = 'programEmpty'; emptyPlaceholder.className = 'empty-state';
+  emptyPlaceholder.textContent = 'No program items yet.';
+  progList.appendChild(emptyPlaceholder);
+
+  // First speaker (female) — no break before, so tense would be 'then' if breaks exist
+  addProgramItem('speaker');
+  let el = document.querySelector('.program-item.speaker:last-of-type') ||
+           [...document.querySelectorAll('.program-item.speaker')].at(-1);
+  document.getElementById(`pi-name-${el.id}`).value  = 'Sister Rachel Jensen';
+  document.getElementById(`pi-topic-${el.id}`).value = 'The Power of Daily Scripture Study';
+
+  // Conduction break before intermediate hymn
+  addProgramItem('break');
+
+  // Intermediate hymn — immediately after break → "now"
+  addProgramItem('hymn');
+  el = [...document.querySelectorAll('.program-item.hymn')].at(-1);
+  document.getElementById(`pi-hnum-${el.id}`).value   = '134';
+  document.getElementById(`pi-htitle-${el.id}`).value = 'I Believe in Christ';
+
+  // Conduction break before concluding speaker
+  addProgramItem('break');
+
+  // Concluding speaker (male) — immediately after break → "now"
+  addProgramItem('speaker');
+  el = [...document.querySelectorAll('.program-item.speaker')].at(-1);
+  document.getElementById(`pi-name-${el.id}`).value  = 'Brother Daniel Reyes';
+  document.getElementById(`pi-topic-${el.id}`).value = 'Covenant Keeping in Modern Times';
+
+  updateProgramBadge();
+}
+</script>
+</body>
+</html>
