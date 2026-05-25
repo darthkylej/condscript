@@ -859,27 +859,27 @@ select { cursor: pointer; appearance: none;
 // Text before {CALLOUT} becomes one spoken-text block; text after becomes another.
 const DEFAULT_PHRASES = {
   welcome:
-    'Good morning and welcome to The Church of Jesus Christ of Latter-day Saints, I am {conducting} and will be conducting our Sacrament meeting Services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time and those watching online.',
+    'Good morning, and welcome to The Church of Jesus Christ of Latter-day Saints. I am {conducting}, and I will be conducting our sacrament meeting services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time, as well as those watching online.',
   openingHymnIntro:
     'We will begin our service by the congregation singing our opening hymn.{CALLOUT}',
   invocationIntro:
-    'after which {invocation} will offer our invocation.',
+    'Following the opening hymn, {invocation} will offer the invocation.',
   sacHymnIntro:
-    'We will now prepare for the Sacred Ordinance of Sacrament by singing the sacrament hymn{CALLOUT}After the sacrament hymn, our priesthood holders will reverently bless and pass the sacrament to all of us in the congregation, while they are preparing and passing the sacrament we invite you to ponder the sacrifice and atonement of our Savior Jesus Christ.',
+    'We will now prepare for the sacred ordinance of the sacrament by singing the sacrament hymn.{CALLOUT}After the sacrament hymn, our priesthood holders will reverently bless and pass the sacrament to all of us in the congregation. While they are preparing and passing the sacrament, we invite you to ponder the sacrifice and Atonement of our Savior, Jesus Christ.',
   afterSacrament:
-    'We thank you for your reverence during the Ordinance of the Sacrament and our service will now continue as follows.',
+    'We thank you for your reverence during the ordinance of the sacrament, and our service will now continue as follows.',
   stakeBusiness:
-    'We will now turn the time over to {by} for some Stake business.',
+    'We will now turn the time over to {by} for some stake business.',
   closingThanks:
-    'We would like to thank everyone that participated in our Sacrament Service today.',
+    'We would like to thank everyone who participated in our sacrament service today.',
   closingHymnIntro:
-    'Our Closing Hymn will be{CALLOUT}',
+    'Our closing hymn will be{CALLOUT}',
   benedictionIntro:
-    'Following the Closing Hymn, {benediction} will offer the benediction.',
+    'Following the closing hymn, {benediction} will offer the benediction.',
   fastTestimonyOpen:
     'Brothers and sisters, today is fast and testimony meeting. I am grateful for this opportunity to bear my testimony...',
   fastPulpitOpen:
-    'The time is now yours to bear your testimonies. We invite you keep your testimonies short and focused on the Savior Jesus Christ',
+    'The time is now yours to bear your testimonies. We invite you to keep your testimonies short and focused on the Savior, Jesus Christ.',
   intermediateHymnIntro:
     'We will{tense} sing an intermediate hymn.{CALLOUT}',
 
@@ -913,39 +913,41 @@ const DEFAULT_PHRASES = {
   lettersLine:
     'We have a letter from Church headquarters to be read.',
   newRecordSingle:
-    'We have received the membership records for {title} {name}. Please stand as your name is read.\n\nPlease join the Bishopric in welcoming {obj} into our Ward Family by the uplifted hand. {PAUSE}',
+    'We have received the membership records for {title} {name}. We ask that {subj} stand.\n\nPlease join the Bishopric in welcoming {obj} into our ward family by the uplifted hand. {PAUSE}',
   newRecordMulti:
-    'We have received the membership records for the following individuals. Please stand as your names are read:\n\n{list}\n\nPlease join the Bishopric in welcoming these members into our Ward Family by the uplifted hand. {PAUSE}',
+    'We have received the membership records for the following individuals. Please stand as your name is read:\n\n{list}\n\nPlease join the Bishopric in welcoming these members into our ward family by the uplifted hand. {PAUSE}',
   babyBlessing:
     'We will now be privileged to witness a baby blessing. {child} will be blessed by {blesser}.\n\nThose who have been invited to participate, please come forward.',
+  babyBlessingMulti:
+    'We will now be privileged to witness the following baby blessings:\n\n{list}\n\nThose who have been invited to participate, please come forward.',
 
   // ── Aaronic Priesthood ────────────────────────────────
   apDeacon:
-    'We propose that {name} receive the Aaronic Priesthood and be ordained a Deacon. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose that {name} receive the Aaronic Priesthood and be ordained a Deacon. We ask that he stand.\n\nThose who can join the Bishopric in sustaining him may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apOrdination:
-    'We propose that {name} be ordained a {office} in the Aaronic Priesthood. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose that {name} be ordained a {office} in the Aaronic Priesthood. We ask that he stand.\n\nThose who can join the Bishopric in sustaining him may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apOrdMulti:
-    'We propose the following to be ordained in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose that can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose the following to be ordained in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose who can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apAdvancement:
-    'We propose that {name} be advanced to the office of {office} in the Aaronic Priesthood. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose that {name} be advanced to the office of {office} in the Aaronic Priesthood. We ask that he stand.\n\nThose who can join the Bishopric in sustaining him may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apAdvMulti:
-    'We propose the following to be advanced in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose that can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose the following to be advanced in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose who can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
 
   // ── Baptisms ──────────────────────────────────────────
   childBapt:
-    '{title} {name}, please stand. {name} was baptized and confirmed{dateStr}, and we want to congratulate {obj} on this important step in {poss} life.',
+    '{title} {name} was baptized and confirmed{dateStr}. We ask that {subj} stand.\n\nWe want to congratulate {obj} on this important step in {poss} life.',
   childBaptMulti:
     'We are pleased to recognize the baptism and confirmation of the following members. Please stand as your name is called:\n\n{list}\n\nWe want to congratulate each of them on this important step in their lives.',
   convertBapt:
-    '{title} {name}, please stand. We are pleased to announce the baptism and confirmation of {title} {name}{dateStr}.\n\nAll those that can join the Bishopric in welcoming {title} {name} into the ward please manifest it by the uplifted hand. {PAUSE}',
+    'We are pleased to announce the baptism and confirmation of {title} {name}{dateStr}. We ask that {subj} stand.\n\nAll those who can join the Bishopric in welcoming {obj} into the ward please manifest it by the uplifted hand. {PAUSE}',
   convertBaptMulti:
-    'We are pleased to announce the baptism and confirmation of the following new members. Please stand as your name is called:\n\n{list}\n\nAll those that can join the Bishopric in welcoming these new members into the ward please manifest it by the uplifted hand. {PAUSE}',
+    'We are pleased to announce the baptism and confirmation of the following new members. Please stand as your name is called:\n\n{list}\n\nAll those who can join the Bishopric in welcoming these new members into the ward please manifest it by the uplifted hand. {PAUSE}',
 
   // ── Program Items ─────────────────────────────────────
   speakerIntro:
     'Our {ordinal} speaker is {name}.',
-  speakerIntroWithTopic:
-    'Our {ordinal} speaker is {name}. The topic today is "{topic}".',
+  speakerIntroOnly:
+    'Our speaker today is {name}.',
 };
 
 // Descriptions for the config UI
@@ -981,9 +983,10 @@ const PHRASE_CONFIG = [
   // ── Ward Business — Other ─────────────────────────────────
   { section:'Ward Business — Other', key:'stakeBusiness',   label:'Stake Business Introduction',      rows:2, tokens:'{by} = name of person conducting stake business' },
   { section:'Ward Business — Other', key:'lettersLine',     label:'Letter from Church HQ',            rows:2, tokens:'No tokens — any details you enter are appended automatically' },
-  { section:'Ward Business — Other', key:'newRecordSingle', label:'New Member Record (single)',       rows:3, tokens:'{title}, {name}, {obj} = him/her, {PAUSE}' },
+  { section:'Ward Business — Other', key:'newRecordSingle', label:'New Member Record (single)',       rows:3, tokens:'{title}, {name}, {subj} = he/she, {obj} = him/her, {PAUSE}' },
   { section:'Ward Business — Other', key:'newRecordMulti',  label:'New Member Records (multiple)',    rows:4, tokens:'{list} = one name per line, {PAUSE}' },
-  { section:'Ward Business — Other', key:'babyBlessing',    label:'Baby Blessing',                    rows:3, tokens:'{child} = child\'s name, {blesser} = who is blessing' },
+  { section:'Ward Business — Other', key:'babyBlessing',    label:'Baby Blessing (single)',           rows:3, tokens:'{child} = child\'s name, {blesser} = who is blessing' },
+  { section:'Ward Business — Other', key:'babyBlessingMulti',label:'Baby Blessings (multiple)',       rows:4, tokens:'{list} = one "{child} will be blessed by {blesser}." per line' },
 
   // ── Aaronic Priesthood ────────────────────────────────────
   { section:'Aaronic Priesthood', key:'apDeacon',      label:'New Deacon Ordination (single)',       rows:3, tokens:'{name}, {PAUSE}' },
@@ -994,11 +997,11 @@ const PHRASE_CONFIG = [
 
   // ── Baptisms ──────────────────────────────────────────────
   { section:'Baptisms', key:'childBapt',       label:'Child of Record Baptism (single)',   rows:3,
-    tokens:'{title} = Bro/Sis, {name}, {dateStr} = " this Thursday"/" last Friday"/" on [date]"/"", {obj} = him/her, {poss} = his/her' },
+    tokens:'{title} = Bro/Sis, {name}, {dateStr} = " this Thursday"/" last Friday"/" on [date]"/"", {subj} = he/she, {obj} = him/her, {poss} = his/her' },
   { section:'Baptisms', key:'childBaptMulti', label:'Child of Record Baptism (multiple)', rows:4,
     tokens:'{list} = one "{title} {name}{dateStr}" per line' },
   { section:'Baptisms', key:'convertBapt',      label:'Convert Baptism (single person)',    rows:4,
-    tokens:'{title}, {name}, {dateStr} = " this Thursday"/" last Friday"/"", {PAUSE}' },
+    tokens:'{title}, {name}, {dateStr} = " this Thursday"/" last Friday"/"", {subj} = he/she, {obj} = him/her, {PAUSE}' },
   { section:'Baptisms', key:'convertBaptMulti', label:'Convert Baptism (multiple people)',  rows:4,
     tokens:'{list} = one "{title} {name}{dateStr}" per line, {PAUSE}' },
 
@@ -1007,8 +1010,8 @@ const PHRASE_CONFIG = [
   { section:'Sacrament', key:'afterSacrament', label:'After Sacrament',              rows:2, tokens:'No tokens' },
 
   // ── Program — Speakers ────────────────────────────────────
-  { section:'Program — Speakers', key:'speakerIntro',          label:'Speaker Introduction',            rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
-  { section:'Program — Speakers', key:'speakerIntroWithTopic', label:'Speaker Introduction with Topic', rows:2, tokens:'{ordinal}, {name}, {topic}' },
+  { section:'Program — Speakers', key:'speakerIntro',     label:'Speaker Introduction (one of several)', rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
+  { section:'Program — Speakers', key:'speakerIntroOnly', label:'Speaker Introduction (only speaker)',   rows:2, tokens:'{name}' },
 
   // ── Program — Hymns ───────────────────────────────────────
   { section:'Program — Hymns', key:'intermediateHymnIntro', label:'Intermediate Hymn Introduction', rows:2,
@@ -1337,7 +1340,6 @@ function addProgramItem(type) {
        <span class="item-type-label">Speaker</span>
        <div class="item-fields">
          <input type="text" placeholder="Speaker name" id="pi-name-${id}">
-         <input type="text" placeholder="Topic (optional)" id="pi-topic-${id}" style="flex:1.5">
        </div>
        <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
     : type === 'hymn'
@@ -1609,7 +1611,7 @@ function generateScript() {
   if (presidingVis) {
     presidingLine = ph('visitorPresides', { name: presidingVis.name || '[Name]' });
   } else {
-    presidingLine = `${presiding || '[Presiding]'} will be Presiding.`;
+    presidingLine = `${presiding || BLANK} will be presiding.`;
   }
 
   // Visitor stand lines (using configurable phrases)
@@ -1709,7 +1711,7 @@ function generateScript() {
       if (rows.length === 1) {
         const { nm, bs } = rows[0];
         const p = bsPronouns(bs);
-        html += say(ph('newRecordSingle', { title:p.title, name:nm, obj:p.obj }));
+        html += say(ph('newRecordSingle', { title:p.title, name:nm, subj:p.subj, obj:p.obj }));
       } else if (rows.length > 1) {
         const list = rows.map(r => `${bsPronouns(r.bs).title} ${r.nm}`).join('\n');
         html += say(ph('newRecordMulti', { list }));
@@ -1772,7 +1774,7 @@ function generateScript() {
       });
       if (cbRows.length === 1) {
         const { nm, p, dateStr } = cbRows[0];
-        html += say(ph('childBapt', { title:p.title, name:nm, dateStr, obj:p.obj, poss:p.poss }));
+        html += say(ph('childBapt', { title:p.title, name:nm, dateStr, subj:p.subj, obj:p.obj, poss:p.poss }));
       } else if (cbRows.length > 1) {
         const list = cbRows.map(({ nm, p, dateStr }) => `${p.title} ${nm}${dateStr}`).join('\n');
         html += say(ph('childBaptMulti', { list }));
@@ -1794,7 +1796,7 @@ function generateScript() {
       });
       if (cvtRows.length === 1) {
         const { nm, p, dateStr } = cvtRows[0];
-        html += say(ph('convertBapt', { title:p.title, name:nm, dateStr }));
+        html += say(ph('convertBapt', { title:p.title, name:nm, dateStr, subj:p.subj, obj:p.obj }));
       } else if (cvtRows.length > 1) {
         const list = cvtRows.map(({ nm, p, dateStr }) => `${p.title} ${nm}${dateStr}`).join('\n');
         html += say(ph('convertBaptMulti', { list }));
@@ -1803,13 +1805,20 @@ function generateScript() {
 
     // Baby Blessings
     if (activeBiz.blessing) {
+      const blessings = [];
       document.querySelectorAll('#blessing-table tbody tr').forEach(r => {
         const id      = r.id.replace('row-','');
         const child   = (document.getElementById(`child-${id}`)?.value || '').trim();
         if (!child) return;
         const blesser = (document.getElementById(`blesser-${id}`)?.value || '').trim() || '[Name]';
-        html += say(ph('babyBlessing', { child, blesser }));
+        blessings.push({ child, blesser });
       });
+      if (blessings.length === 1) {
+        html += say(ph('babyBlessing', blessings[0]));
+      } else if (blessings.length > 1) {
+        const list = blessings.map(b => `${b.child} will be blessed by ${b.blesser}.`).join('\n');
+        html += say(ph('babyBlessingMulti', { list }));
+      }
     }
   }
 
@@ -1837,12 +1846,15 @@ function generateScript() {
     html += secHead('Program');
     const ordinals = ['first','second','third','fourth','fifth','sixth','seventh','eighth'];
 
-    // Pre-identify the last filled speaker (gets "concluding" label)
+    // Pre-identify the last filled speaker (gets "concluding" label, but only if there are 2+ speakers)
     const filledSpeakerEls = piDoms.filter(el =>
       el.classList.contains('speaker') &&
       (document.getElementById(`pi-name-${el.id}`)?.value || '').trim()
     );
-    const lastSpeakerEl = filledSpeakerEls[filledSpeakerEls.length - 1] || null;
+    const isSingleSpeaker = filledSpeakerEls.length === 1;
+    const lastSpeakerEl   = filledSpeakerEls.length > 1
+      ? filledSpeakerEls[filledSpeakerEls.length - 1]
+      : null;
 
     // Does any break exist in the program? Determines whether to use "now"/"then" at all.
     const hasBreaks = piDoms.some(el => el.classList.contains('break'));
@@ -1863,13 +1875,16 @@ function generateScript() {
       prevWasBreak = false; // reset after consuming
 
       if (el.classList.contains('speaker')) {
-        const name  = (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
+        const name = (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
         if (!name) return; // skip empty speakers
-        const topic = (document.getElementById(`pi-topic-${el.id}`)?.value || '').trim();
-        const isLast = el === lastSpeakerEl;
-        const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
+        if (isSingleSpeaker) {
+          html += say(ph('speakerIntroOnly', { name }));
+        } else {
+          const isLast  = el === lastSpeakerEl;
+          const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
+          html += say(ph('speakerIntro', { ordinal, name }));
+        }
         speakerCount++;
-        html += say(ph(topic ? 'speakerIntroWithTopic' : 'speakerIntro', { ordinal, name, topic }));
       } else if (el.classList.contains('hymn')) {
         const hnum   = (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim();
         const htitle = (document.getElementById(`pi-htitle-${el.id}`)?.value || '').trim();
@@ -2130,7 +2145,6 @@ function fillTestMode_DISABLED() {
   let el = document.querySelector('.program-item.speaker:last-of-type') ||
            [...document.querySelectorAll('.program-item.speaker')].at(-1);
   document.getElementById(`pi-name-${el.id}`).value  = 'Sister Rachel Jensen';
-  document.getElementById(`pi-topic-${el.id}`).value = 'The Power of Daily Scripture Study';
 
   // Conduction break before intermediate hymn
   addProgramItem('break');
@@ -2148,7 +2162,6 @@ function fillTestMode_DISABLED() {
   addProgramItem('speaker');
   el = [...document.querySelectorAll('.program-item.speaker')].at(-1);
   document.getElementById(`pi-name-${el.id}`).value  = 'Brother Daniel Reyes';
-  document.getElementById(`pi-topic-${el.id}`).value = 'Covenant Keeping in Modern Times';
 
   updateProgramBadge();
 }
