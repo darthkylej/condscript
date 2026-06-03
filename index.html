@@ -352,9 +352,113 @@ select { cursor: pointer; appearance: none;
   .form-row { flex-wrap: wrap; }
   .form-group.narrow { flex: 1; min-width: 140px; }
 }
+
+/* ── Auth / Login ───────────────────────────────────────────── */
+#loginOverlay {
+  position: fixed; inset: 0; background: var(--cream); z-index: 500;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.login-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; max-width: 420px; overflow: hidden; }
+.login-header { background: linear-gradient(135deg, var(--navy), var(--navy-lt)); color: white; padding: 24px; text-align: center; }
+.login-header h2 { font-size: 1.1rem; font-weight: 700; margin-top: 10px; }
+.login-header p  { font-size: .8rem; opacity: .75; margin-top: 4px; }
+.login-body { padding: 24px; }
+.login-error { color: var(--red); font-size: .825rem; margin-top: 8px; background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px; padding: 8px 12px; }
+
+/* ── Auth header pill ───────────────────────────────────────── */
+#authInfo { display: flex; align-items: center; gap: 8px; }
+.ward-pill { font-size: .72rem; font-weight: 600; background: rgba(255,255,255,.18); padding: 3px 10px; border-radius: 12px; }
+
+/* ── Cloud save indicator ───────────────────────────────────── */
+#cloudSaved { color: #86efac; font-size: .78rem; font-weight: 600; opacity: 0; transition: opacity .3s; margin-right: 4px; }
+
+/* ── History tab ────────────────────────────────────────────── */
+.history-item { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1.5px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; background: white; }
+.history-item-date { font-weight: 600; font-size: .875rem; }
+.history-item-meta { font-size: .75rem; color: var(--gray-400); margin-top: 2px; }
+
+/* ── Ward management ────────────────────────────────────────── */
+.member-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
+.member-row:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
+
+<!-- ═══════════ LOGIN OVERLAY ═══════════ -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-header">
+      <svg width="36" height="36" viewBox="0 0 28 28" fill="none"><path d="M14 2L4 9v16h7v-7h6v7h7V9L14 2z" fill="rgba(255,255,255,.9)"/></svg>
+      <h2>Sacrament Meeting Conductor</h2>
+      <p>Sign in to save and share your program</p>
+    </div>
+    <div class="login-body">
+      <!-- Step 1: Email -->
+      <div id="loginStep1">
+        <div class="form-group" style="margin-bottom:14px">
+          <label>Email Address</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com" onkeydown="if(event.key==='Enter')loginSendOtp()" style="font-size:1rem">
+        </div>
+        <div id="loginError1" class="login-error" style="display:none"></div>
+        <button class="btn btn-primary" id="loginSendBtn" onclick="loginSendOtp()" style="width:100%;padding:11px;font-size:.95rem;margin-top:4px">Send Login Code</button>
+      </div>
+      <!-- Step 2: Code -->
+      <div id="loginStep2" style="display:none">
+        <p style="font-size:.875rem;margin-bottom:14px">A 6-digit code was sent to <strong id="loginEmailDisplay"></strong>.</p>
+        <div class="form-group" style="margin-bottom:14px">
+          <label>Login Code</label>
+          <input type="text" id="loginCode" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter')loginVerifyOtp()" style="font-size:1.8rem;letter-spacing:.4em;text-align:center;font-weight:700">
+        </div>
+        <div id="loginError2" class="login-error" style="display:none"></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn btn-secondary" onclick="loginBack()" style="flex:0 0 auto">← Back</button>
+          <button class="btn btn-primary" id="loginVerifyBtn" onclick="loginVerifyOtp()" style="flex:1;padding:11px">Sign In</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ WARD SETUP MODAL ═══════════ -->
+<div class="modal-overlay" id="wardSetupModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Welcome! Set Up Your Ward</h3>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.875rem;margin-bottom:16px;color:var(--gray-600)">You're not part of a ward yet. Create one to start saving programs and building history.</p>
+      <div class="form-group">
+        <label>Ward Name</label>
+        <input type="text" id="newWardName" placeholder="e.g. Seguin 1st Ward" onkeydown="if(event.key==='Enter')createWard()">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="createWard()">Create Ward</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ WARD MANAGEMENT MODAL ═══════════ -->
+<div class="modal-overlay" id="wardMgmtModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="wardMgmtName">Ward Management</h3>
+      <button class="btn btn-icon btn-secondary" onclick="document.getElementById('wardMgmtModal').classList.remove('show')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-600);margin-bottom:8px">Members</p>
+      <div id="wardMemberList" style="margin-bottom:16px"></div>
+      <hr class="divider">
+      <p style="font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-600);margin-bottom:8px">Add Member by Email</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input type="email" id="newMemberEmail" placeholder="email@example.com" style="flex:1" onkeydown="if(event.key==='Enter')addMember()">
+        <button class="btn btn-primary" onclick="addMember()">Add</button>
+      </div>
+      <hr class="divider">
+      <button class="btn btn-danger btn-sm" onclick="leaveWard()" style="margin-top:4px">Leave this Ward</button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════ APP HEADER ═══════════ -->
 <header class="app-header">
@@ -368,6 +472,8 @@ select { cursor: pointer; appearance: none;
     </div>
   </div>
   <div class="header-actions">
+    <span id="cloudSaved">✓ Saved</span>
+    <div id="authInfo"></div>
     <button class="btn btn-secondary btn-sm" onclick="clearAll()">↺ Reset</button>
   </div>
 </header>
@@ -376,6 +482,7 @@ select { cursor: pointer; appearance: none;
 <nav class="tab-nav">
   <button class="tab-btn active" id="tbBuilder" onclick="switchTab('builder')">📋 Builder</button>
   <button class="tab-btn" id="tbConfig"  onclick="switchTab('config')">⚙ Configuration</button>
+  <button class="tab-btn" id="tbHistory" onclick="switchTab('history')">📚 History</button>
 </nav>
 
 <!-- ═══════════ BUILDER TAB ═══════════ -->
@@ -766,6 +873,21 @@ select { cursor: pointer; appearance: none;
   </div>
 </div>
 
+<!-- ═══════════ HISTORY TAB ═══════════ -->
+<div id="historyTab" class="main-container" style="display:none">
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">📚</div>
+      <h2>Meeting History</h2>
+      <button class="btn btn-outline btn-sm" onclick="exportHistoryCsv()" style="margin-left:auto">⬇ Export CSV</button>
+    </div>
+    <div class="card-body">
+      <p class="text-muted" style="margin-bottom:14px">Click <strong>Load</strong> to restore a past program into the builder. Your current form will be replaced.</p>
+      <div id="historyContent"><p class="empty-state">Sign in and join a ward to see meeting history.</p></div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ SCRIPT VIEW ═══════════ -->
 <div id="scriptView">
   <div class="script-toolbar">
@@ -859,27 +981,27 @@ select { cursor: pointer; appearance: none;
 // Text before {CALLOUT} becomes one spoken-text block; text after becomes another.
 const DEFAULT_PHRASES = {
   welcome:
-    'Good morning, and welcome to The Church of Jesus Christ of Latter-day Saints. I am {conducting}, and I will be conducting our sacrament meeting services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time, as well as those watching online.',
+    'Good morning and welcome to The Church of Jesus Christ of Latter-day Saints, I am {conducting} and will be conducting our Sacrament meeting Services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time and those watching online.',
   openingHymnIntro:
     'We will begin our service by the congregation singing our opening hymn.{CALLOUT}',
   invocationIntro:
-    'Following the opening hymn, {invocation} will offer the invocation.',
+    'after which {invocation} will offer our invocation.',
   sacHymnIntro:
-    'We will now prepare for the sacred ordinance of the sacrament by singing the sacrament hymn.{CALLOUT}After the sacrament hymn, our priesthood holders will reverently bless and pass the sacrament to all of us in the congregation. While they are preparing and passing the sacrament, we invite you to ponder the sacrifice and Atonement of our Savior, Jesus Christ.',
+    'We will now prepare for the Sacred Ordinance of Sacrament by singing the sacrament hymn{CALLOUT}After the sacrament hymn, our priesthood holders will reverently bless and pass the sacrament to all of us in the congregation, while they are preparing and passing the sacrament we invite you to ponder the sacrifice and atonement of our Savior Jesus Christ.',
   afterSacrament:
-    'We thank you for your reverence during the ordinance of the sacrament, and our service will now continue as follows.',
+    'We thank you for your reverence during the Ordinance of the Sacrament and our service will now continue as follows.',
   stakeBusiness:
-    'We will now turn the time over to {by} for some stake business.',
+    'We will now turn the time over to {by} for some Stake business.',
   closingThanks:
-    'We would like to thank everyone who participated in our sacrament service today.',
+    'We would like to thank everyone that participated in our Sacrament Service today.',
   closingHymnIntro:
-    'Our closing hymn will be{CALLOUT}',
+    'Our Closing Hymn will be{CALLOUT}',
   benedictionIntro:
-    'Following the closing hymn, {benediction} will offer the benediction.',
+    'Following the Closing Hymn, {benediction} will offer the benediction.',
   fastTestimonyOpen:
     'Brothers and sisters, today is fast and testimony meeting. I am grateful for this opportunity to bear my testimony...',
   fastPulpitOpen:
-    'The time is now yours to bear your testimonies. We invite you to keep your testimonies short and focused on the Savior, Jesus Christ.',
+    'The time is now yours to bear your testimonies. We invite you keep your testimonies short and focused on the Savior Jesus Christ',
   intermediateHymnIntro:
     'We will{tense} sing an intermediate hymn.{CALLOUT}',
 
@@ -913,41 +1035,39 @@ const DEFAULT_PHRASES = {
   lettersLine:
     'We have a letter from Church headquarters to be read.',
   newRecordSingle:
-    'We have received the membership records for {title} {name}. We ask that {subj} stand.\n\nPlease join the Bishopric in welcoming {obj} into our ward family by the uplifted hand. {PAUSE}',
+    'We have received the membership records for {title} {name}. Please stand as your name is read.\n\nPlease join the Bishopric in welcoming {obj} into our Ward Family by the uplifted hand. {PAUSE}',
   newRecordMulti:
-    'We have received the membership records for the following individuals. Please stand as your name is read:\n\n{list}\n\nPlease join the Bishopric in welcoming these members into our ward family by the uplifted hand. {PAUSE}',
+    'We have received the membership records for the following individuals. Please stand as your names are read:\n\n{list}\n\nPlease join the Bishopric in welcoming these members into our Ward Family by the uplifted hand. {PAUSE}',
   babyBlessing:
     'We will now be privileged to witness a baby blessing. {child} will be blessed by {blesser}.\n\nThose who have been invited to participate, please come forward.',
-  babyBlessingMulti:
-    'We will now be privileged to witness the following baby blessings:\n\n{list}\n\nThose who have been invited to participate, please come forward.',
 
   // ── Aaronic Priesthood ────────────────────────────────
   apDeacon:
-    'We propose that {name} receive the Aaronic Priesthood and be ordained a Deacon. We ask that he stand.\n\nThose who can join the Bishopric in sustaining him may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose that {name} receive the Aaronic Priesthood and be ordained a Deacon. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apOrdination:
-    'We propose that {name} be ordained a {office} in the Aaronic Priesthood. We ask that he stand.\n\nThose who can join the Bishopric in sustaining him may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose that {name} be ordained a {office} in the Aaronic Priesthood. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apOrdMulti:
-    'We propose the following to be ordained in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose who can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose the following to be ordained in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose that can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apAdvancement:
-    'We propose that {name} be advanced to the office of {office} in the Aaronic Priesthood. We ask that he stand.\n\nThose who can join the Bishopric in sustaining him may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose that {name} be advanced to the office of {office} in the Aaronic Priesthood. Will {name} please stand.\n\nThose that can join the Bishopric in sustaining {name} may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
   apAdvMulti:
-    'We propose the following to be advanced in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose who can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
+    'We propose the following to be advanced in the Aaronic Priesthood. Please stand as your name is called:\n\n{list}\n\nThose that can join the Bishopric in sustaining them may manifest it by the uplifted hand. {PAUSE} Those opposed, if any, may manifest it. {PAUSE}',
 
   // ── Baptisms ──────────────────────────────────────────
   childBapt:
-    '{title} {name} was baptized and confirmed{dateStr}. We ask that {subj} stand.\n\nWe want to congratulate {obj} on this important step in {poss} life.',
+    '{title} {name}, please stand. {name} was baptized and confirmed{dateStr}, and we want to congratulate {obj} on this important step in {poss} life.',
   childBaptMulti:
     'We are pleased to recognize the baptism and confirmation of the following members. Please stand as your name is called:\n\n{list}\n\nWe want to congratulate each of them on this important step in their lives.',
   convertBapt:
-    'We are pleased to announce the baptism and confirmation of {title} {name}{dateStr}. We ask that {subj} stand.\n\nAll those who can join the Bishopric in welcoming {obj} into the ward please manifest it by the uplifted hand. {PAUSE}',
+    '{title} {name}, please stand. We are pleased to announce the baptism and confirmation of {title} {name}{dateStr}.\n\nAll those that can join the Bishopric in welcoming {title} {name} into the ward please manifest it by the uplifted hand. {PAUSE}',
   convertBaptMulti:
-    'We are pleased to announce the baptism and confirmation of the following new members. Please stand as your name is called:\n\n{list}\n\nAll those who can join the Bishopric in welcoming these new members into the ward please manifest it by the uplifted hand. {PAUSE}',
+    'We are pleased to announce the baptism and confirmation of the following new members. Please stand as your name is called:\n\n{list}\n\nAll those that can join the Bishopric in welcoming these new members into the ward please manifest it by the uplifted hand. {PAUSE}',
 
   // ── Program Items ─────────────────────────────────────
   speakerIntro:
     'Our {ordinal} speaker is {name}.',
-  speakerIntroOnly:
-    'Our speaker today is {name}.',
+  speakerIntroWithTopic:
+    'Our {ordinal} speaker is {name}. The topic today is "{topic}".',
 };
 
 // Descriptions for the config UI
@@ -983,10 +1103,9 @@ const PHRASE_CONFIG = [
   // ── Ward Business — Other ─────────────────────────────────
   { section:'Ward Business — Other', key:'stakeBusiness',   label:'Stake Business Introduction',      rows:2, tokens:'{by} = name of person conducting stake business' },
   { section:'Ward Business — Other', key:'lettersLine',     label:'Letter from Church HQ',            rows:2, tokens:'No tokens — any details you enter are appended automatically' },
-  { section:'Ward Business — Other', key:'newRecordSingle', label:'New Member Record (single)',       rows:3, tokens:'{title}, {name}, {subj} = he/she, {obj} = him/her, {PAUSE}' },
+  { section:'Ward Business — Other', key:'newRecordSingle', label:'New Member Record (single)',       rows:3, tokens:'{title}, {name}, {obj} = him/her, {PAUSE}' },
   { section:'Ward Business — Other', key:'newRecordMulti',  label:'New Member Records (multiple)',    rows:4, tokens:'{list} = one name per line, {PAUSE}' },
-  { section:'Ward Business — Other', key:'babyBlessing',    label:'Baby Blessing (single)',           rows:3, tokens:'{child} = child\'s name, {blesser} = who is blessing' },
-  { section:'Ward Business — Other', key:'babyBlessingMulti',label:'Baby Blessings (multiple)',       rows:4, tokens:'{list} = one "{child} will be blessed by {blesser}." per line' },
+  { section:'Ward Business — Other', key:'babyBlessing',    label:'Baby Blessing',                    rows:3, tokens:'{child} = child\'s name, {blesser} = who is blessing' },
 
   // ── Aaronic Priesthood ────────────────────────────────────
   { section:'Aaronic Priesthood', key:'apDeacon',      label:'New Deacon Ordination (single)',       rows:3, tokens:'{name}, {PAUSE}' },
@@ -997,11 +1116,11 @@ const PHRASE_CONFIG = [
 
   // ── Baptisms ──────────────────────────────────────────────
   { section:'Baptisms', key:'childBapt',       label:'Child of Record Baptism (single)',   rows:3,
-    tokens:'{title} = Bro/Sis, {name}, {dateStr} = " this Thursday"/" last Friday"/" on [date]"/"", {subj} = he/she, {obj} = him/her, {poss} = his/her' },
+    tokens:'{title} = Bro/Sis, {name}, {dateStr} = " this Thursday"/" last Friday"/" on [date]"/"", {obj} = him/her, {poss} = his/her' },
   { section:'Baptisms', key:'childBaptMulti', label:'Child of Record Baptism (multiple)', rows:4,
     tokens:'{list} = one "{title} {name}{dateStr}" per line' },
   { section:'Baptisms', key:'convertBapt',      label:'Convert Baptism (single person)',    rows:4,
-    tokens:'{title}, {name}, {dateStr} = " this Thursday"/" last Friday"/"", {subj} = he/she, {obj} = him/her, {PAUSE}' },
+    tokens:'{title}, {name}, {dateStr} = " this Thursday"/" last Friday"/"", {PAUSE}' },
   { section:'Baptisms', key:'convertBaptMulti', label:'Convert Baptism (multiple people)',  rows:4,
     tokens:'{list} = one "{title} {name}{dateStr}" per line, {PAUSE}' },
 
@@ -1010,8 +1129,8 @@ const PHRASE_CONFIG = [
   { section:'Sacrament', key:'afterSacrament', label:'After Sacrament',              rows:2, tokens:'No tokens' },
 
   // ── Program — Speakers ────────────────────────────────────
-  { section:'Program — Speakers', key:'speakerIntro',     label:'Speaker Introduction (one of several)', rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
-  { section:'Program — Speakers', key:'speakerIntroOnly', label:'Speaker Introduction (only speaker)',   rows:2, tokens:'{name}' },
+  { section:'Program — Speakers', key:'speakerIntro',          label:'Speaker Introduction',            rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
+  { section:'Program — Speakers', key:'speakerIntroWithTopic', label:'Speaker Introduction with Topic', rows:2, tokens:'{ordinal}, {name}, {topic}' },
 
   // ── Program — Hymns ───────────────────────────────────────
   { section:'Program — Hymns', key:'intermediateHymnIntro', label:'Intermediate Hymn Introduction', rows:2,
@@ -1144,11 +1263,14 @@ function escHtml(s) {
 
 /* ── Tab Switching ───────────────────────────────────────────── */
 function switchTab(tab) {
-  document.getElementById('app').style.display       = tab === 'builder' ? '' : 'none';
-  document.getElementById('configTab').style.display = tab === 'config'  ? '' : 'none';
+  document.getElementById('app').style.display        = tab === 'builder' ? '' : 'none';
+  document.getElementById('configTab').style.display  = tab === 'config'  ? '' : 'none';
+  document.getElementById('historyTab').style.display = tab === 'history' ? '' : 'none';
   document.getElementById('tbBuilder').classList.toggle('active', tab === 'builder');
   document.getElementById('tbConfig').classList.toggle('active',  tab === 'config');
-  if (tab === 'config') renderConfigTab();
+  document.getElementById('tbHistory').classList.toggle('active', tab === 'history');
+  if (tab === 'config')  renderConfigTab();
+  if (tab === 'history') loadHistoryTab();
 }
 
 /* ── State ─────────────────────────────────────────────────── */
@@ -1170,6 +1292,8 @@ window.addEventListener('DOMContentLoaded', () => {
     .forEach(k => { activeBiz[k] = false; });
 
   addAnnouncement();
+  initSaveHooks();
+  initAuth();
 });
 
 /* ── Fast Sunday ─────────────────────────────────────────────── */
@@ -1203,6 +1327,7 @@ function toggleBusiness(key) {
   activeBiz[key] = !activeBiz[key];
   document.getElementById(`bi-${key}`).classList.toggle('active', activeBiz[key]);
   document.getElementById(`bc-${key}`).textContent = activeBiz[key] ? '✓' : '';
+  scheduleSave(`business_${key}`, () => collectBusiness(key));
 }
 
 /* ── Brother/Sister Toggle ───────────────────────────────────── */
@@ -1324,8 +1449,8 @@ function readPersonRows(tableId, hasCallingCol) {
 }
 
 /* ── Program Builder ─────────────────────────────────────────── */
-function addProgramItem(type) {
-  if (type === 'speaker' && document.getElementById('fastSunday').checked) {
+function addProgramItem(type, preload = null) {
+  if (type === 'speaker' && document.getElementById('fastSunday').checked && !preload) {
     if (!confirm('Fast Sunday typically has no assigned speakers. Add one anyway?')) return;
   }
   const id = 'pi-' + Date.now();
@@ -1340,6 +1465,7 @@ function addProgramItem(type) {
        <span class="item-type-label">Speaker</span>
        <div class="item-fields">
          <input type="text" placeholder="Speaker name" id="pi-name-${id}">
+         <input type="text" placeholder="Topic (optional)" id="pi-topic-${id}" style="flex:1.5">
        </div>
        <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
     : type === 'hymn'
@@ -1357,7 +1483,18 @@ function addProgramItem(type) {
        <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`;
   list.appendChild(div);
   setupDrag(div);
+  // Pre-fill values if loading from saved data
+  if (preload) {
+    if (type === 'speaker') {
+      if (preload.name)  document.getElementById(`pi-name-${id}`).value  = preload.name;
+      if (preload.topic) document.getElementById(`pi-topic-${id}`).value = preload.topic;
+    } else if (type === 'hymn') {
+      if (preload.num)   document.getElementById(`pi-hnum-${id}`).value  = preload.num;
+      if (preload.title) document.getElementById(`pi-htitle-${id}`).value = preload.title;
+    }
+  }
   updateProgramBadge();
+  scheduleSave('program_order', collectProgramOrder);
 }
 
 function dots() {
@@ -1520,6 +1657,7 @@ function addVisitor() {
   renderVisitorItem(v);
   updateVisitorBadge();
   closeVisitorModal();
+  scheduleSave('visitors', collectVisitors);
 }
 
 function renderVisitorItem(v) {
@@ -1611,7 +1749,7 @@ function generateScript() {
   if (presidingVis) {
     presidingLine = ph('visitorPresides', { name: presidingVis.name || '[Name]' });
   } else {
-    presidingLine = `${presiding || BLANK} will be presiding.`;
+    presidingLine = `${presiding || '[Presiding]'} will be Presiding.`;
   }
 
   // Visitor stand lines (using configurable phrases)
@@ -1711,7 +1849,7 @@ function generateScript() {
       if (rows.length === 1) {
         const { nm, bs } = rows[0];
         const p = bsPronouns(bs);
-        html += say(ph('newRecordSingle', { title:p.title, name:nm, subj:p.subj, obj:p.obj }));
+        html += say(ph('newRecordSingle', { title:p.title, name:nm, obj:p.obj }));
       } else if (rows.length > 1) {
         const list = rows.map(r => `${bsPronouns(r.bs).title} ${r.nm}`).join('\n');
         html += say(ph('newRecordMulti', { list }));
@@ -1774,7 +1912,7 @@ function generateScript() {
       });
       if (cbRows.length === 1) {
         const { nm, p, dateStr } = cbRows[0];
-        html += say(ph('childBapt', { title:p.title, name:nm, dateStr, subj:p.subj, obj:p.obj, poss:p.poss }));
+        html += say(ph('childBapt', { title:p.title, name:nm, dateStr, obj:p.obj, poss:p.poss }));
       } else if (cbRows.length > 1) {
         const list = cbRows.map(({ nm, p, dateStr }) => `${p.title} ${nm}${dateStr}`).join('\n');
         html += say(ph('childBaptMulti', { list }));
@@ -1796,7 +1934,7 @@ function generateScript() {
       });
       if (cvtRows.length === 1) {
         const { nm, p, dateStr } = cvtRows[0];
-        html += say(ph('convertBapt', { title:p.title, name:nm, dateStr, subj:p.subj, obj:p.obj }));
+        html += say(ph('convertBapt', { title:p.title, name:nm, dateStr }));
       } else if (cvtRows.length > 1) {
         const list = cvtRows.map(({ nm, p, dateStr }) => `${p.title} ${nm}${dateStr}`).join('\n');
         html += say(ph('convertBaptMulti', { list }));
@@ -1805,20 +1943,13 @@ function generateScript() {
 
     // Baby Blessings
     if (activeBiz.blessing) {
-      const blessings = [];
       document.querySelectorAll('#blessing-table tbody tr').forEach(r => {
         const id      = r.id.replace('row-','');
         const child   = (document.getElementById(`child-${id}`)?.value || '').trim();
         if (!child) return;
         const blesser = (document.getElementById(`blesser-${id}`)?.value || '').trim() || '[Name]';
-        blessings.push({ child, blesser });
+        html += say(ph('babyBlessing', { child, blesser }));
       });
-      if (blessings.length === 1) {
-        html += say(ph('babyBlessing', blessings[0]));
-      } else if (blessings.length > 1) {
-        const list = blessings.map(b => `${b.child} will be blessed by ${b.blesser}.`).join('\n');
-        html += say(ph('babyBlessingMulti', { list }));
-      }
     }
   }
 
@@ -1846,15 +1977,12 @@ function generateScript() {
     html += secHead('Program');
     const ordinals = ['first','second','third','fourth','fifth','sixth','seventh','eighth'];
 
-    // Pre-identify the last filled speaker (gets "concluding" label, but only if there are 2+ speakers)
+    // Pre-identify the last filled speaker (gets "concluding" label)
     const filledSpeakerEls = piDoms.filter(el =>
       el.classList.contains('speaker') &&
       (document.getElementById(`pi-name-${el.id}`)?.value || '').trim()
     );
-    const isSingleSpeaker = filledSpeakerEls.length === 1;
-    const lastSpeakerEl   = filledSpeakerEls.length > 1
-      ? filledSpeakerEls[filledSpeakerEls.length - 1]
-      : null;
+    const lastSpeakerEl = filledSpeakerEls[filledSpeakerEls.length - 1] || null;
 
     // Does any break exist in the program? Determines whether to use "now"/"then" at all.
     const hasBreaks = piDoms.some(el => el.classList.contains('break'));
@@ -1875,16 +2003,13 @@ function generateScript() {
       prevWasBreak = false; // reset after consuming
 
       if (el.classList.contains('speaker')) {
-        const name = (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
+        const name  = (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
         if (!name) return; // skip empty speakers
-        if (isSingleSpeaker) {
-          html += say(ph('speakerIntroOnly', { name }));
-        } else {
-          const isLast  = el === lastSpeakerEl;
-          const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
-          html += say(ph('speakerIntro', { ordinal, name }));
-        }
+        const topic = (document.getElementById(`pi-topic-${el.id}`)?.value || '').trim();
+        const isLast = el === lastSpeakerEl;
+        const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
         speakerCount++;
+        html += say(ph(topic ? 'speakerIntroWithTopic' : 'speakerIntro', { ordinal, name, topic }));
       } else if (el.classList.contains('hymn')) {
         const hnum   = (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim();
         const htitle = (document.getElementById(`pi-htitle-${el.id}`)?.value || '').trim();
@@ -2145,6 +2270,7 @@ function fillTestMode_DISABLED() {
   let el = document.querySelector('.program-item.speaker:last-of-type') ||
            [...document.querySelectorAll('.program-item.speaker')].at(-1);
   document.getElementById(`pi-name-${el.id}`).value  = 'Sister Rachel Jensen';
+  document.getElementById(`pi-topic-${el.id}`).value = 'The Power of Daily Scripture Study';
 
   // Conduction break before intermediate hymn
   addProgramItem('break');
@@ -2162,8 +2288,498 @@ function fillTestMode_DISABLED() {
   addProgramItem('speaker');
   el = [...document.querySelectorAll('.program-item.speaker')].at(-1);
   document.getElementById(`pi-name-${el.id}`).value  = 'Brother Daniel Reyes';
+  document.getElementById(`pi-topic-${el.id}`).value = 'Covenant Keeping in Modern Times';
 
   updateProgramBadge();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CLOUD SYNC — Auth, Ward, Save / Load
+══════════════════════════════════════════════════════════════ */
+const API_URL   = 'https://condscript-api.kylecluff.workers.dev';
+const TOKEN_KEY = 'condscript_jwt';
+let AUTH        = { token: null, email: null, ward: null };
+const saveTimers = {};
+
+// ── API helper ─────────────────────────────────────────────────
+async function api(method, path, body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (AUTH.token) opts.headers['Authorization'] = `Bearer ${AUTH.token}`;
+  if (body !== null) opts.body = JSON.stringify(body);
+  try {
+    const res = await fetch(API_URL + path, opts);
+    return await res.json();
+  } catch (e) { return { error: e.message }; }
+}
+
+// ── Auth ───────────────────────────────────────────────────────
+async function initAuth() {
+  AUTH.token = localStorage.getItem(TOKEN_KEY);
+  // Hide app until we know auth state
+  document.getElementById('app').style.display        = 'none';
+  document.getElementById('configTab').style.display  = 'none';
+  document.getElementById('historyTab').style.display = 'none';
+  document.querySelector('.tab-nav').style.display    = 'none';
+
+  if (!AUTH.token) { showLoginScreen(); return; }
+
+  const me = await api('GET', '/auth/me');
+  if (me.error || !me.email) {
+    localStorage.removeItem(TOKEN_KEY);
+    AUTH.token = null;
+    showLoginScreen();
+    return;
+  }
+
+  AUTH.email = me.email;
+  AUTH.ward  = me.ward;
+  updateAuthHeader();
+
+  if (!AUTH.ward) { showWardSetup(); return; }
+
+  showApp();
+  await loadLatestMeeting();
+}
+
+function showLoginScreen() {
+  document.getElementById('loginOverlay').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.querySelector('.tab-nav').style.display      = '';
+  updateAuthHeader();
+  switchTab('builder');
+}
+
+function showWardSetup() {
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('wardSetupModal').classList.add('show');
+}
+
+function updateAuthHeader() {
+  const el = document.getElementById('authInfo');
+  if (!el || !AUTH.email) return;
+  el.innerHTML = `
+    <span style="font-size:.72rem;opacity:.75">${escHtml(AUTH.email)}</span>
+    ${AUTH.ward ? `<button class="btn btn-secondary btn-sm ward-pill" onclick="openWardManagement()">${escHtml(AUTH.ward.name)}</button>` : ''}
+    <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Sign out</button>
+  `;
+}
+
+// ── Login flow ─────────────────────────────────────────────────
+async function loginSendOtp() {
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  if (!email || !email.includes('@')) { showLoginErr(1, 'Please enter a valid email address.'); return; }
+  const btn = document.getElementById('loginSendBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const result = await api('POST', '/auth/send-otp', { email });
+  btn.disabled = false; btn.textContent = 'Send Login Code';
+  if (result.error) { showLoginErr(1, result.error); return; }
+  document.getElementById('loginStep1').style.display = 'none';
+  document.getElementById('loginStep2').style.display = '';
+  document.getElementById('loginEmailDisplay').textContent = email;
+  document.getElementById('loginCode').value = '';
+  document.getElementById('loginCode').focus();
+}
+
+async function loginVerifyOtp() {
+  const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+  const code  = document.getElementById('loginCode').value.trim();
+  if (code.length !== 6) { showLoginErr(2, 'Please enter the 6-digit code.'); return; }
+  const btn = document.getElementById('loginVerifyBtn');
+  btn.disabled = true; btn.textContent = 'Verifying…';
+  const result = await api('POST', '/auth/verify-otp', { email, code });
+  btn.disabled = false; btn.textContent = 'Sign In';
+  if (result.error) { showLoginErr(2, result.error); return; }
+  AUTH.token = result.token; AUTH.email = result.email; AUTH.ward = result.ward;
+  localStorage.setItem(TOKEN_KEY, result.token);
+  if (!AUTH.ward) { document.getElementById('loginOverlay').style.display = 'none'; showWardSetup(); }
+  else { showApp(); await loadLatestMeeting(); }
+}
+
+function loginBack() {
+  document.getElementById('loginStep2').style.display = 'none';
+  document.getElementById('loginStep1').style.display = '';
+  document.getElementById('loginError1').style.display = 'none';
+  document.getElementById('loginError2').style.display = 'none';
+}
+
+function showLoginErr(step, msg) {
+  const el = document.getElementById(`loginError${step}`);
+  el.textContent = msg; el.style.display = '';
+}
+
+async function handleLogout() {
+  if (!confirm('Sign out?')) return;
+  await api('POST', '/auth/logout');
+  AUTH = { token: null, email: null, ward: null };
+  localStorage.removeItem(TOKEN_KEY);
+  location.reload();
+}
+
+// ── Ward ───────────────────────────────────────────────────────
+async function createWard() {
+  const name = document.getElementById('newWardName').value.trim();
+  if (!name) { alert('Please enter a ward name.'); return; }
+  const result = await api('POST', '/ward/create', { name });
+  if (result.error) { alert(result.error); return; }
+  AUTH.ward = result.ward;
+  document.getElementById('wardSetupModal').classList.remove('show');
+  showApp();
+  await loadLatestMeeting();
+}
+
+async function openWardManagement() {
+  const result = await api('GET', '/ward');
+  if (result.error || !result.ward) { alert(result.error || 'Could not load ward.'); return; }
+  const ward = result.ward;
+  document.getElementById('wardMgmtName').textContent = ward.name;
+  document.getElementById('wardMemberList').innerHTML = (ward.members || []).map(m => `
+    <div class="member-row">
+      <span style="flex:1;font-size:.875rem">${escHtml(m.email)}</span>
+      ${m.email !== AUTH.email
+        ? `<button class="btn btn-danger btn-sm" onclick="removeMember('${escHtml(m.email)}')">Remove</button>`
+        : '<span style="font-size:.75rem;color:var(--gray-400)">(you)</span>'}
+    </div>`).join('');
+  document.getElementById('newMemberEmail').value = '';
+  document.getElementById('wardMgmtModal').classList.add('show');
+}
+
+async function addMember() {
+  const email = document.getElementById('newMemberEmail').value.trim().toLowerCase();
+  if (!email) return;
+  const result = await api('POST', '/ward/members/add', { email });
+  if (result.error) { alert(result.error); return; }
+  openWardManagement();
+}
+
+async function removeMember(email) {
+  if (!confirm(`Remove ${email} from the ward?`)) return;
+  const result = await api('POST', '/ward/members/remove', { email });
+  if (result.error) { alert(result.error); return; }
+  openWardManagement();
+}
+
+async function leaveWard() {
+  if (!confirm('Are you sure you want to leave this ward?\n\nYou will need someone else to re-add you to regain access.')) return;
+  if (!confirm('Final confirmation — leave ward?')) return;
+  const result = await api('POST', '/ward/leave');
+  if (result.error) { alert(result.error); return; }
+  AUTH.ward = null;
+  document.getElementById('wardMgmtModal').classList.remove('show');
+  showWardSetup();
+}
+
+// ── Save ───────────────────────────────────────────────────────
+function scheduleSave(fieldKey, collectFn, delay = 900) {
+  clearTimeout(saveTimers[fieldKey]);
+  saveTimers[fieldKey] = setTimeout(async () => {
+    if (!AUTH.token || !AUTH.ward) return;
+    const date = document.getElementById('meetingDate').value;
+    if (!date) return;
+    const value = collectFn();
+    const result = await api('POST', `/meetings/${date}/field`, { field_key: fieldKey, field_value: value });
+    if (!result.error) showCloudSaved();
+  }, delay);
+}
+
+function showCloudSaved() {
+  const el = document.getElementById('cloudSaved');
+  if (!el) return;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
+}
+
+function collectMeta() {
+  return {
+    wardName: document.getElementById('wardName').value,
+    meetingDate: document.getElementById('meetingDate').value,
+    presidingName: document.getElementById('presidingName').value,
+    conductingName: document.getElementById('conductingName').value,
+    fastSunday: document.getElementById('fastSunday').checked,
+    chorister: document.getElementById('chorister').value,
+    organist: document.getElementById('organist').value,
+  };
+}
+
+function collectPrayers() {
+  return {
+    invocation:  document.getElementById('invocation').value,
+    benediction: document.getElementById('benediction').value,
+  };
+}
+
+function collectMusic() {
+  return {
+    openingNum:   document.getElementById('openingHymnNum').value,
+    openingTitle: document.getElementById('openingHymnTitle').value,
+    sacNum:       document.getElementById('sacHymnNum').value,
+    sacTitle:     document.getElementById('sacHymnTitle').value,
+    closingNum:   document.getElementById('closingHymnNum').value,
+    closingTitle: document.getElementById('closingHymnTitle').value,
+  };
+}
+
+function collectAnnouncements() {
+  return announcements.map(id => {
+    const el = document.getElementById(`ann-text-${id}`);
+    return el ? el.value : '';
+  }).filter(v => v.trim());
+}
+
+function collectVisitors() { return visitors; }
+
+function collectBusiness(key) {
+  const result = { active: activeBiz[key] };
+  if (key === 'stake') {
+    result.conductor = document.getElementById('stake-conductor')?.value || '';
+  } else if (key === 'letters') {
+    result.details = document.getElementById('letters-details')?.value || '';
+  } else {
+    const tbody = document.querySelector(`#${key}-table tbody`);
+    if (!tbody) return result;
+    result.rows = [...tbody.querySelectorAll('tr[id]')].map(tr => {
+      const id = tr.id.replace('row-', '');
+      const row = { id };
+      // name field (different prefix per table)
+      const nameId = key === 'apnew' ? `ap-name-${id}` : key === 'apadv' ? `adv-name-${id}` : key === 'childbapt' ? `cb-name-${id}` : key === 'convertbapt' ? `cvt-name-${id}` : `name-${id}`;
+      row.name = document.getElementById(nameId)?.value || '';
+      // bs toggle
+      const bsEl = document.getElementById(`bs-${id}`);
+      if (bsEl) row.bs = bsEl.dataset.val || 'Brother';
+      // calling / office
+      if (key === 'releases' || key === 'sustainings') row.col = document.getElementById(`col-${id}`)?.value || '';
+      if (key === 'blessing') { row.child = document.getElementById(`child-${id}`)?.value || ''; row.blesser = document.getElementById(`blesser-${id}`)?.value || ''; delete row.name; }
+      if (key === 'apnew')  row.office = document.getElementById(`ap-office-${id}`)?.value || '';
+      if (key === 'apadv')  row.office = document.getElementById(`adv-office-${id}`)?.value || '';
+      if (key === 'childbapt')   row.date = document.getElementById(`cb-date-${id}`)?.value || '';
+      if (key === 'convertbapt') row.date = document.getElementById(`cvt-date-${id}`)?.value || '';
+      return row;
+    });
+  }
+  return result;
+}
+
+function collectProgramOrder() {
+  return programItems.map(item => {
+    const el = document.getElementById(item.id);
+    if (!el) return null;
+    const id = item.id;
+    if (item.type === 'break')   return { type: 'break' };
+    if (item.type === 'speaker') return { type: 'speaker', name: document.getElementById(`pi-name-${id}`)?.value || '', topic: document.getElementById(`pi-topic-${id}`)?.value || '' };
+    if (item.type === 'hymn')    return { type: 'hymn', num: document.getElementById(`pi-hnum-${id}`)?.value || '', title: document.getElementById(`pi-htitle-${id}`)?.value || '' };
+    return null;
+  }).filter(Boolean);
+}
+
+// ── Load ───────────────────────────────────────────────────────
+async function loadLatestMeeting() {
+  if (!AUTH.token || !AUTH.ward) return;
+  const date = document.getElementById('meetingDate').value;
+  if (!date) return;
+  const result = await api('GET', `/meetings/${date}`);
+  if (result.error || !result.meeting) return;
+  loadMeeting(result.meeting.program);
+}
+
+function loadMeeting(prog) {
+  if (!prog) return;
+
+  if (prog.meta) {
+    const m = prog.meta;
+    if (m.wardName      != null) document.getElementById('wardName').value       = m.wardName;
+    if (m.presidingName != null) document.getElementById('presidingName').value  = m.presidingName;
+    if (m.conductingName!= null) document.getElementById('conductingName').value = m.conductingName;
+    if (m.chorister     != null) document.getElementById('chorister').value      = m.chorister;
+    if (m.organist      != null) document.getElementById('organist').value       = m.organist;
+    if (m.fastSunday    != null) { document.getElementById('fastSunday').checked = m.fastSunday; onFastSundayChange(); }
+  }
+
+  if (prog.prayers) {
+    if (prog.prayers.invocation  != null) document.getElementById('invocation').value  = prog.prayers.invocation;
+    if (prog.prayers.benediction != null) document.getElementById('benediction').value = prog.prayers.benediction;
+  }
+
+  if (prog.music) {
+    const mu = prog.music;
+    if (mu.openingNum   != null) document.getElementById('openingHymnNum').value   = mu.openingNum;
+    if (mu.openingTitle != null) document.getElementById('openingHymnTitle').value = mu.openingTitle;
+    if (mu.sacNum       != null) document.getElementById('sacHymnNum').value       = mu.sacNum;
+    if (mu.sacTitle     != null) document.getElementById('sacHymnTitle').value     = mu.sacTitle;
+    if (mu.closingNum   != null) document.getElementById('closingHymnNum').value   = mu.closingNum;
+    if (mu.closingTitle != null) document.getElementById('closingHymnTitle').value = mu.closingTitle;
+  }
+
+  if (Array.isArray(prog.announcements)) {
+    document.getElementById('announcementList').innerHTML = '';
+    announcements = [];
+    prog.announcements.forEach(text => {
+      addAnnouncement();
+      const el = document.getElementById(`ann-text-${announcements[announcements.length-1]}`);
+      if (el) el.value = text;
+    });
+    if (!announcements.length) addAnnouncement();
+  }
+
+  if (Array.isArray(prog.visitors)) {
+    visitors = [];
+    const list = document.getElementById('visitorList');
+    list.innerHTML = '';
+    const empty = document.createElement('div');
+    empty.id = 'visitorEmpty'; empty.className = 'empty-state'; empty.textContent = 'No visitors added.';
+    list.appendChild(empty);
+    prog.visitors.forEach(v => { visitors.push(v); renderVisitorItem(v); });
+    updateVisitorBadge();
+  }
+
+  const bizKeys = ['stake','releases','sustainings','letters','newrecords','blessing','apnew','apadv','childbapt','convertbapt'];
+  bizKeys.forEach(key => {
+    const data = prog[`business_${key}`];
+    if (!data) return;
+    if (!!data.active !== !!activeBiz[key]) toggleBusiness(key);
+    loadBizData(key, data);
+  });
+
+  if (Array.isArray(prog.program_order)) {
+    programItems = [];
+    document.getElementById('programList').innerHTML = '';
+    const empty = document.createElement('div');
+    empty.id = 'programEmpty'; empty.className = 'empty-state'; empty.textContent = 'No program items yet.';
+    document.getElementById('programList').appendChild(empty);
+    prog.program_order.forEach(item => addProgramItem(item.type, item));
+    updateProgramBadge();
+  }
+
+  if (prog.config && typeof prog.config === 'object') { Object.assign(CONFIG, prog.config); saveConfig(); }
+}
+
+function loadBizData(key, data) {
+  if (key === 'stake') { if (data.conductor) document.getElementById('stake-conductor').value = data.conductor; return; }
+  if (key === 'letters') { if (data.details) document.getElementById('letters-details').value = data.details; return; }
+  if (!Array.isArray(data.rows)) return;
+
+  const tbody = document.querySelector(`#${key}-table tbody`);
+  if (tbody) tbody.innerHTML = '';
+
+  const addMap = {
+    releases:    () => addPersonRow('releases','calling'),
+    sustainings: () => addPersonRow('sustainings','calling'),
+    newrecords:  () => addPersonRow('newrecords','none'),
+    blessing:    addBlessingRow,
+    apnew:       addApRow,
+    apadv:       addAdvRow,
+    childbapt:   addChildBaptRow,
+    convertbapt: addConvertBaptRow,
+  };
+
+  data.rows.forEach(row => {
+    if (addMap[key]) addMap[key]();
+    const tbody2 = document.querySelector(`#${key}-table tbody`);
+    const lastTr = tbody2?.lastElementChild;
+    if (!lastTr) return;
+    const id = lastTr.id.replace('row-', '');
+
+    const setVal = (elId, val) => { const el = document.getElementById(elId); if (el && val != null) el.value = val; };
+    const setBsVal = (val) => {
+      const bsEl = document.getElementById(`bs-${id}`);
+      if (!bsEl || !val) return;
+      bsEl.dataset.val = val;
+      bsEl.querySelectorAll('.bs-btn').forEach(b => b.classList.toggle('active', b.textContent.trim().startsWith(val === 'Brother' ? 'Bro' : 'Sis')));
+    };
+
+    if (key === 'releases' || key === 'sustainings' || key === 'newrecords') {
+      setVal(`name-${id}`, row.name); setBsVal(row.bs);
+      if (row.col) setVal(`col-${id}`, row.col);
+    } else if (key === 'blessing') {
+      setVal(`child-${id}`, row.child); setVal(`blesser-${id}`, row.blesser);
+    } else if (key === 'apnew') {
+      setVal(`ap-name-${id}`, row.name); setVal(`ap-office-${id}`, row.office);
+    } else if (key === 'apadv') {
+      setVal(`adv-name-${id}`, row.name); setVal(`adv-office-${id}`, row.office);
+    } else if (key === 'childbapt') {
+      setVal(`cb-name-${id}`, row.name); setBsVal(row.bs); setVal(`cb-date-${id}`, row.date);
+    } else if (key === 'convertbapt') {
+      setVal(`cvt-name-${id}`, row.name); setBsVal(row.bs); setVal(`cvt-date-${id}`, row.date);
+    }
+  });
+}
+
+// ── Save hooks ─────────────────────────────────────────────────
+function initSaveHooks() {
+  const metaIds    = ['wardName','meetingDate','presidingName','conductingName','fastSunday','chorister','organist'];
+  const prayerIds  = ['invocation','benediction'];
+  const musicIds   = ['openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
+
+  metaIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.addEventListener('input',  () => scheduleSave('meta',    collectMeta));
+              el.addEventListener('change', () => scheduleSave('meta',    collectMeta)); }
+  });
+  prayerIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.addEventListener('input',  () => scheduleSave('prayers', collectPrayers));
+              el.addEventListener('change', () => scheduleSave('prayers', collectPrayers)); }
+  });
+  musicIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.addEventListener('input',  () => scheduleSave('music',   collectMusic));
+              el.addEventListener('change', () => scheduleSave('music',   collectMusic)); }
+  });
+
+  document.getElementById('announcementList').addEventListener('input', () => scheduleSave('announcements', collectAnnouncements));
+
+  ['stake','releases','sustainings','letters','newrecords','blessing','apnew','apadv','childbapt','convertbapt'].forEach(key => {
+    const el = document.getElementById(`bi-${key}`);
+    if (el) { el.addEventListener('input',  () => scheduleSave(`business_${key}`, () => collectBusiness(key)));
+              el.addEventListener('change', () => scheduleSave(`business_${key}`, () => collectBusiness(key))); }
+  });
+
+  document.getElementById('programList').addEventListener('input', () => scheduleSave('program_order', collectProgramOrder));
+}
+
+// ── History tab ────────────────────────────────────────────────
+async function loadHistoryTab() {
+  if (!AUTH.token || !AUTH.ward) {
+    document.getElementById('historyContent').innerHTML = '<p class="empty-state">Sign in and join a ward to see history.</p>';
+    return;
+  }
+  document.getElementById('historyContent').innerHTML = '<p style="text-align:center;color:var(--gray-400);padding:20px">Loading…</p>';
+  const result = await api('GET', '/meetings?limit=52');
+  if (result.error) { document.getElementById('historyContent').innerHTML = `<p style="color:var(--red)">${escHtml(result.error)}</p>`; return; }
+  const meetings = result.meetings || [];
+  if (!meetings.length) { document.getElementById('historyContent').innerHTML = '<p class="empty-state">No meetings saved yet.</p>'; return; }
+  document.getElementById('historyContent').innerHTML = meetings.map(m => {
+    const d = new Date(m.meeting_date + 'T12:00:00');
+    const fmt = d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    return `<div class="history-item">
+      <div style="flex:1"><div class="history-item-date">${escHtml(fmt)}</div><div class="history-item-meta">Saved by ${escHtml(m.saved_by||'unknown')}</div></div>
+      <button class="btn btn-outline btn-sm" onclick="loadHistoryMeeting('${m.meeting_date}')">Load</button>
+    </div>`;
+  }).join('');
+}
+
+async function loadHistoryMeeting(date) {
+  if (!confirm(`Load the program from ${date}? This will replace your current form.`)) return;
+  const result = await api('GET', `/meetings/${date}`);
+  if (result.error || !result.meeting) { alert('Could not load that meeting.'); return; }
+  switchTab('builder');
+  document.getElementById('meetingDate').value = date;
+  loadMeeting(result.meeting.program);
+}
+
+async function exportHistoryCsv() {
+  if (!AUTH.token || !AUTH.ward) { alert('Sign in to export.'); return; }
+  const res = await fetch(API_URL + '/meetings/export.csv', {
+    headers: { 'Authorization': `Bearer ${AUTH.token}` }
+  });
+  if (!res.ok) { alert('Export failed.'); return; }
+  const text = await res.text();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+  a.download = 'condscript-history.csv';
+  a.click();
 }
 </script>
 </body>
