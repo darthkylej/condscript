@@ -1338,9 +1338,10 @@ function addAnnouncement() {
       <input type="text" placeholder="Announcement text..." id="ann-text-${id}">
     </div>
     <div style="flex:0 0 auto;display:flex;align-items:flex-end;padding-bottom:1px">
-      <button class="btn btn-icon btn-danger" onclick="document.getElementById('ann-${id}').remove();announcements=announcements.filter(a=>a!==${id})">✕</button>
+      <button class="btn btn-icon btn-danger" onclick="removeAnnouncement(${id})">✕</button>
     </div>`;
   container.appendChild(row);
+  scheduleReplace('ann', ['announcement'], buildAnnouncementComponents);
 }
 
 /* ── Business Toggles ────────────────────────────────────────── */
@@ -1358,6 +1359,12 @@ function setBs(btn, val, containerId) {
   c.dataset.val = val;
   c.querySelectorAll('.bs-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  // Find which business table this belongs to and trigger a save
+  const table = btn.closest('table');
+  if (table) {
+    const bizKey = table.id?.replace('-table','');
+    if (bizKey) triggerBizSave(bizKey);
+  }
 }
 function getBs(containerId) {
   return document.getElementById(containerId)?.dataset.val || 'Brother';
@@ -1373,6 +1380,26 @@ function bsPronouns(bs) {
   return { subj:'he', obj:'him', poss:'his', title:'Brother' };
 }
 
+/* ── Save helpers for structural changes ─────────────────────── */
+function triggerBizSave(bizKey) {
+  const typeMap = { releases:'release', sustainings:'sustaining', newrecords:'new_record',
+    blessing:'baby_blessing', apnew:'ap_ordination', apadv:'ap_advancement',
+    childbapt:'child_baptism', convertbapt:'convert_baptism' };
+  const t = typeMap[bizKey];
+  if (t) scheduleReplace(`biz_${bizKey}`, [t], () => buildBusinessComponents(bizKey));
+}
+
+function removeRow(id, bizKey) {
+  document.getElementById(`row-${id}`)?.remove();
+  triggerBizSave(bizKey);
+}
+
+function removeAnnouncement(id) {
+  document.getElementById(`ann-${id}`)?.remove();
+  announcements = announcements.filter(a => a !== id);
+  scheduleReplace('ann', ['announcement'], buildAnnouncementComponents);
+}
+
 /* ── Dynamic Rows ────────────────────────────────────────────── */
 function addPersonRow(tableId, extraCol) {
   const tbody = document.querySelector(`#${tableId}-table tbody`);
@@ -1380,13 +1407,13 @@ function addPersonRow(tableId, extraCol) {
   const tr = document.createElement('tr'); tr.id = `row-${id}`;
   let extraTd = '';
   if (extraCol === 'calling') extraTd = `<td><input type="text" placeholder="Calling" id="col-${id}"></td>`;
-  else if (extraCol === 'date') extraTd = `<td><input type="text" placeholder="Date" id="col-${id}"></td>`;
   tr.innerHTML = `
     <td><input type="text" placeholder="Full name" id="name-${id}"></td>
     <td style="width:80px">${bsToggleHtml(id)}</td>
     ${extraTd}
-    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="removeRow(${id},'${tableId}')">✕</button></td>`;
   tbody.appendChild(tr);
+  triggerBizSave(tableId);
 }
 
 function addBlessingRow() {
@@ -1396,8 +1423,9 @@ function addBlessingRow() {
   tr.innerHTML = `
     <td><input type="text" placeholder="Child's full name" id="child-${id}"></td>
     <td><input type="text" placeholder="Father's name / who is blessing" id="blesser-${id}"></td>
-    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="removeRow(${id},'blessing')">✕</button></td>`;
   tbody.appendChild(tr);
+  triggerBizSave('blessing');
 }
 
 function addApRow() {
@@ -1407,14 +1435,15 @@ function addApRow() {
   tr.innerHTML = `
     <td><input type="text" placeholder="Full name" id="ap-name-${id}"></td>
     <td style="width:120px">
-      <select id="ap-office-${id}">
+      <select id="ap-office-${id}" onchange="triggerBizSave('apnew')">
         <option value="Deacon">Deacon</option>
         <option value="Teacher">Teacher</option>
         <option value="Priest">Priest</option>
       </select>
     </td>
-    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="removeRow(${id},'apnew')">✕</button></td>`;
   tbody.appendChild(tr);
+  triggerBizSave('apnew');
 }
 
 function addAdvRow() {
@@ -1424,13 +1453,14 @@ function addAdvRow() {
   tr.innerHTML = `
     <td><input type="text" placeholder="Full name" id="adv-name-${id}"></td>
     <td style="width:120px">
-      <select id="adv-office-${id}">
+      <select id="adv-office-${id}" onchange="triggerBizSave('apadv')">
         <option value="Teacher">Teacher</option>
         <option value="Priest">Priest</option>
       </select>
     </td>
-    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="removeRow(${id},'apadv')">✕</button></td>`;
   tbody.appendChild(tr);
+  triggerBizSave('apadv');
 }
 
 function addChildBaptRow() {
@@ -1441,8 +1471,9 @@ function addChildBaptRow() {
     <td><input type="text" placeholder="Child's name" id="cb-name-${id}"></td>
     <td style="width:80px">${bsToggleHtml(id)}</td>
     <td><input type="text" placeholder="Date" id="cb-date-${id}"></td>
-    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="removeRow(${id},'childbapt')">✕</button></td>`;
   tbody.appendChild(tr);
+  triggerBizSave('childbapt');
 }
 
 function addConvertBaptRow() {
@@ -1453,8 +1484,9 @@ function addConvertBaptRow() {
     <td><input type="text" placeholder="Full name" id="cvt-name-${id}"></td>
     <td style="width:80px">${bsToggleHtml(id)}</td>
     <td><input type="text" placeholder="Date baptized" id="cvt-date-${id}"></td>
-    <td><button class="btn btn-icon btn-danger btn-sm" onclick="document.getElementById('row-${id}').remove()">✕</button></td>`;
+    <td><button class="btn btn-icon btn-danger btn-sm" onclick="removeRow(${id},'convertbapt')">✕</button></td>`;
   tbody.appendChild(tr);
+  triggerBizSave('convertbapt');
 }
 
 function readPersonRows(tableId, hasCallingCol) {
@@ -2502,7 +2534,7 @@ function showCloudSaved() {
 }
 
 // Metadata → PATCH to meetings table columns
-function schedulePatchMetadata(delay = 900) {
+function schedulePatchMetadata(delay = 400) {
   if (_suppressSaves) return;
   clearTimeout(saveTimers['meta']);
   saveTimers['meta'] = setTimeout(async () => {
@@ -2513,7 +2545,7 @@ function schedulePatchMetadata(delay = 900) {
 }
 
 // Ordered components → replace-type in meeting_components table
-function scheduleReplace(key, types, buildFn, delay = 900) {
+function scheduleReplace(key, types, buildFn, delay = 400) {
   if (_suppressSaves) return;
   clearTimeout(saveTimers[key]);
   saveTimers[key] = setTimeout(async () => {
@@ -2811,9 +2843,7 @@ async function loadHistoryTab() {
         <div class="history-item-date">${escHtml(fmt)}${isCurrent?' <span style="font-size:.7rem;background:var(--navy);color:white;padding:1px 7px;border-radius:8px;margin-left:6px;vertical-align:middle">OPEN</span>':''}</div>
         <div class="history-item-meta">${isPast?'📅 Past meeting':'📋 Upcoming'}</div>
       </div>
-      ${isCurrent
-        ? '<span style="font-size:.8rem;color:var(--navy);font-weight:600">Currently editing</span>'
-        : `<button class="btn btn-outline btn-sm" onclick="navigateToMeeting('${m.meeting_date}')">Open</button>`}
+      <button class="btn btn-sm ${isCurrent?'btn-primary':'btn-outline'}" onclick="navigateToMeeting('${m.meeting_date}')">${isCurrent?'Go to Builder →':'Open'}</button>
     </div>`;
   }).join('');
 }
