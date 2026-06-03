@@ -1519,7 +1519,7 @@ function addProgramItem(type, preload = null) {
     }
   }
   updateProgramBadge();
-  scheduleSave('program_order', collectProgramOrder);
+  scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break'], buildProgramComponents);
 }
 
 function dots() {
@@ -2508,15 +2508,17 @@ function showCloudSaved() {
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 
-function scheduleBatch(key, buildFn, delay = 900) {
-  clearTimeout(saveTimers[key]);
-  saveTimers[key] = setTimeout(async () => {
+// Metadata → PATCH to meetings table columns
+function schedulePatchMetadata(delay = 900) {
+  clearTimeout(saveTimers['meta']);
+  saveTimers['meta'] = setTimeout(async () => {
     if (!AUTH.token || !AUTH.ward || !currentMeetingDate) return;
-    const result = await api('POST', `/meetings/${currentMeetingDate}/components/batch`, { components: buildFn() });
+    const result = await api('PATCH', `/meetings/${currentMeetingDate}/metadata`, buildMetadata());
     if (!result.error) showCloudSaved();
   }, delay);
 }
 
+// Ordered components → replace-type in meeting_components table
 function scheduleReplace(key, types, buildFn, delay = 900) {
   clearTimeout(saveTimers[key]);
   saveTimers[key] = setTimeout(async () => {
@@ -2526,52 +2528,49 @@ function scheduleReplace(key, types, buildFn, delay = 900) {
   }, delay);
 }
 
-// ── Build functions (form → components) ───────────────────────
-function buildMetaComponents() {
-  return [
-    { component_type:'ward_name',  component_key:'ward_name',  notes: g('wardName')||'' },
-    { component_type:'presiding',  component_key:'presiding',  person_name: g('presidingName')||'' },
-    { component_type:'conducting', component_key:'conducting', person_name: g('conductingName')||'' },
-    { component_type:'fast_sunday',component_key:'fast_sunday',extra_data:{value:document.getElementById('fastSunday').checked}},
-    { component_type:'chorister',  component_key:'chorister',  person_name: g('chorister')||'' },
-    { component_type:'organist',   component_key:'organist',   person_name: g('organist')||'' },
-  ];
+// ── Build metadata object (maps to meetings table columns) ─────
+function buildMetadata() {
+  return {
+    ward_name:             g('wardName')         || '',
+    presiding_name:        g('presidingName')    || '',
+    conducting_name:       g('conductingName')   || '',
+    chorister:             g('chorister')        || '',
+    organist:              g('organist')         || '',
+    invocation:            g('invocation')       || '',
+    benediction:           g('benediction')      || '',
+    is_fast_sunday:        document.getElementById('fastSunday').checked,
+    opening_hymn_number:   g('openingHymnNum')   || '',
+    opening_hymn_title:    g('openingHymnTitle') || '',
+    sacrament_hymn_number: g('sacHymnNum')       || '',
+    sacrament_hymn_title:  g('sacHymnTitle')     || '',
+    closing_hymn_number:   g('closingHymnNum')   || '',
+    closing_hymn_title:    g('closingHymnTitle') || '',
+  };
 }
-function buildPrayerComponents() {
-  return [
-    { component_type:'invocation', component_key:'invocation', person_name: g('invocation')||'' },
-    { component_type:'benediction',component_key:'benediction',person_name: g('benediction')||'' },
-  ];
-}
-function buildMusicComponents() {
-  return [
-    { component_type:'opening_hymn',   component_key:'opening_hymn',   hymn_number:g('openingHymnNum'), hymn_title:g('openingHymnTitle') },
-    { component_type:'sacrament_hymn', component_key:'sacrament_hymn', hymn_number:g('sacHymnNum'),     hymn_title:g('sacHymnTitle') },
-    { component_type:'closing_hymn',   component_key:'closing_hymn',   hymn_number:g('closingHymnNum'), hymn_title:g('closingHymnTitle') },
-  ];
-}
+
+// ── Build component arrays (maps to meeting_components table) ──
 function buildAnnouncementComponents() {
   return announcements.map((id, i) => ({
-    component_type:'announcement', component_key:`announcement:${i}`, component_order:i,
+    component_type:'announcement', component_order:i,
     notes: document.getElementById(`ann-text-${id}`)?.value || '',
   })).filter(c => c.notes.trim());
 }
 function buildVisitorComponents() {
   return visitors.map((v, i) => ({
-    component_type:'visitor', component_key:`visitor:${i}`, component_order:i,
+    component_type:'visitor', component_order:i,
     person_name: v.name || '',
     extra_data: { callingVal:v.callingVal, info:v.info, recognized:v.recognized, hcOnAssignment:v.hcOnAssignment },
   }));
 }
 function buildBusinessComponents(key) {
-  if (key === 'stake')   return [{ component_type:'stake_business',   component_key:'stake_business',   extra_data:{ active:activeBiz['stake'],   conductor: document.getElementById('stake-conductor')?.value||'' }}];
-  if (key === 'letters') return [{ component_type:'letters_business', component_key:'letters_business', extra_data:{ active:activeBiz['letters'], details:   document.getElementById('letters-details')?.value||'' }}];
+  if (key === 'stake')   return [{ component_type:'stake_business',   component_order:0, extra_data:{ active:activeBiz['stake'],   conductor: document.getElementById('stake-conductor')?.value||'' }}];
+  if (key === 'letters') return [{ component_type:'letters_business', component_order:0, notes: document.getElementById('letters-details')?.value||'', extra_data:{ active:activeBiz['letters'] }}];
   const typeMap = { releases:'release',sustainings:'sustaining',newrecords:'new_record',blessing:'baby_blessing',apnew:'ap_ordination',apadv:'ap_advancement',childbapt:'child_baptism',convertbapt:'convert_baptism' };
   const compType = typeMap[key]; if (!compType) return [];
   const tbody = document.querySelector(`#${key}-table tbody`); if (!tbody) return [];
   return [...tbody.querySelectorAll('tr[id]')].map((tr, i) => {
     const id = tr.id.replace('row-','');
-    const c = { component_type:compType, component_key:`${compType}:${i}`, component_order:i };
+    const c = { component_type:compType, component_order:i };
     if (key==='releases'||key==='sustainings') { c.person_name=document.getElementById(`name-${id}`)?.value||''; c.person_title=document.getElementById(`bs-${id}`)?.dataset.val||'Brother'; c.notes=document.getElementById(`col-${id}`)?.value||''; }
     else if (key==='newrecords') { c.person_name=document.getElementById(`name-${id}`)?.value||''; c.person_title=document.getElementById(`bs-${id}`)?.dataset.val||'Brother'; }
     else if (key==='blessing')    { c.extra_data={ child:document.getElementById(`child-${id}`)?.value||'', blesser:document.getElementById(`blesser-${id}`)?.value||'' }; }
@@ -2586,36 +2585,36 @@ function buildProgramComponents() {
   const typeMap = { speaker:'talk', hymn:'intermediate_hymn', break:'conduction_break' };
   return programItems.map((item, i) => {
     const el = document.getElementById(item.id); if (!el) return null;
-    const ct = typeMap[item.type];
-    const c = { component_type:ct, component_key:`${ct}:${i}`, component_order:i };
+    const c = { component_type:typeMap[item.type], component_order:i };
     if (item.type==='speaker') { c.person_name=document.getElementById(`pi-name-${item.id}`)?.value||''; c.topic=document.getElementById(`pi-topic-${item.id}`)?.value||''; }
     if (item.type==='hymn')    { c.hymn_number=document.getElementById(`pi-hnum-${item.id}`)?.value||''; c.hymn_title=document.getElementById(`pi-htitle-${item.id}`)?.value||''; }
     return c;
   }).filter(Boolean);
 }
 
-// ── Load: components → form ────────────────────────────────────
+// ── Load: server data → form ───────────────────────────────────
 function setV(id, val)    { const el = document.getElementById(id); if (el && val != null) el.value = val; }
 function setBsT(id, title){ const b = document.getElementById(`bs-${id}`); if (!b||!title) return; b.dataset.val=title; b.querySelectorAll('.bs-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.trim().startsWith(title==='Brother'?'Bro':'Sis'))); }
 
-function loadMeetingFromComponents(components, date) {
-  if (!components) return;
-  const byKey = {}; const byType = {};
-  components.forEach(c => { byKey[c.component_key]=c; (byType[c.component_type]=byType[c.component_type]||[]).push(c); });
-  Object.values(byType).forEach(arr => arr.sort((a,b)=>a.component_order-b.component_order));
-
-  // Single-value
-  if (byKey['ward_name'])     document.getElementById('wardName').value       = byKey['ward_name'].notes     || '';
-  if (byKey['presiding'])     document.getElementById('presidingName').value  = byKey['presiding'].person_name || '';
-  if (byKey['conducting'])    document.getElementById('conductingName').value = byKey['conducting'].person_name || '';
-  if (byKey['chorister'])     document.getElementById('chorister').value      = byKey['chorister'].person_name || '';
-  if (byKey['organist'])      document.getElementById('organist').value       = byKey['organist'].person_name  || '';
-  if (byKey['invocation'])    document.getElementById('invocation').value     = byKey['invocation'].person_name || '';
-  if (byKey['benediction'])   document.getElementById('benediction').value    = byKey['benediction'].person_name || '';
-  if (byKey['fast_sunday'])   { document.getElementById('fastSunday').checked = byKey['fast_sunday'].extra_data?.value||false; onFastSundayChange(); }
-  if (byKey['opening_hymn'])  { setV('openingHymnNum',byKey['opening_hymn'].hymn_number); setV('openingHymnTitle',byKey['opening_hymn'].hymn_title); }
-  if (byKey['sacrament_hymn']){ setV('sacHymnNum',byKey['sacrament_hymn'].hymn_number);   setV('sacHymnTitle',byKey['sacrament_hymn'].hymn_title); }
-  if (byKey['closing_hymn'])  { setV('closingHymnNum',byKey['closing_hymn'].hymn_number); setV('closingHymnTitle',byKey['closing_hymn'].hymn_title); }
+function loadMeetingFromComponents(components, date, metadata) {
+  // Load metadata (from meetings table columns)
+  if (metadata) {
+    const m = metadata;
+    setV('wardName',        m.ward_name);
+    setV('presidingName',   m.presiding_name);
+    setV('conductingName',  m.conducting_name);
+    setV('chorister',       m.chorister);
+    setV('organist',        m.organist);
+    setV('invocation',      m.invocation);
+    setV('benediction',     m.benediction);
+    setV('openingHymnNum',  m.opening_hymn_number);
+    setV('openingHymnTitle',m.opening_hymn_title);
+    setV('sacHymnNum',      m.sacrament_hymn_number);
+    setV('sacHymnTitle',    m.sacrament_hymn_title);
+    setV('closingHymnNum',  m.closing_hymn_number);
+    setV('closingHymnTitle',m.closing_hymn_title);
+    if (m.is_fast_sunday != null) { document.getElementById('fastSunday').checked = m.is_fast_sunday; onFastSundayChange(); }
+  }
 
   // Announcements
   if (byType['announcement']?.length) {
@@ -2675,10 +2674,9 @@ async function loadMeetingByDate(date) {
   if (!AUTH.token || !AUTH.ward) return;
   const result = await api('GET', `/meetings/${date}`);
   if (result.error) return;
-  if (result.meeting?.components) {
-    loadMeetingFromComponents(result.meeting.components, date);
+  if (result.meeting) {
+    loadMeetingFromComponents(result.meeting.components || [], date, result.meeting.metadata || {});
   } else {
-    // No data yet — just set the date and clear the form
     clearFormForNewMeeting(date);
   }
 }
@@ -2722,13 +2720,11 @@ function updateCurrentProgramBanner() {
 
 // ── Save hooks ─────────────────────────────────────────────────
 function initSaveHooks() {
-  const metaIds   = ['wardName','meetingDate','presidingName','conductingName','fastSunday','chorister','organist'];
-  const prayerIds = ['invocation','benediction'];
-  const musicIds  = ['openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
-
-  metaIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleBatch('meta',buildMetaComponents))); });
-  prayerIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleBatch('prayers',buildPrayerComponents))); });
-  musicIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleBatch('music',buildMusicComponents))); });
+  // All metadata fields (ward name, presiding, hymns, prayers, etc.) → PATCH /metadata
+  const metaIds = ['wardName','presidingName','conductingName','fastSunday','chorister','organist',
+                   'invocation','benediction',
+                   'openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
+  metaIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>schedulePatchMetadata())); });
 
   document.getElementById('announcementList').addEventListener('input', ()=>scheduleReplace('ann',['announcement'],buildAnnouncementComponents));
 
