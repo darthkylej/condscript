@@ -482,7 +482,7 @@ select { cursor: pointer; appearance: none;
 <nav class="tab-nav">
   <button class="tab-btn active" id="tbBuilder" onclick="switchTab('builder')">📋 Builder</button>
   <button class="tab-btn" id="tbConfig"  onclick="switchTab('config')">⚙ Configuration</button>
-  <button class="tab-btn" id="tbHistory" onclick="switchTab('history')">📚 History</button>
+  <button class="tab-btn" id="tbHistory" onclick="switchTab('history')">📅 Programs</button>
 </nav>
 
 <!-- ═══════════ BUILDER TAB ═══════════ -->
@@ -873,17 +873,41 @@ select { cursor: pointer; appearance: none;
   </div>
 </div>
 
-<!-- ═══════════ HISTORY TAB ═══════════ -->
+<!-- ═══════════ PROGRAMS TAB ═══════════ -->
 <div id="historyTab" class="main-container" style="display:none">
+
+  <!-- New Meeting Panel -->
+  <div id="newMeetingPanel" class="card" style="display:none;margin-bottom:16px">
+    <div class="card-header"><div class="icon">➕</div><h2>Create New Program</h2></div>
+    <div class="card-body">
+      <div class="form-row" style="align-items:flex-end">
+        <div class="form-group narrow">
+          <label>Meeting Date</label>
+          <input type="date" id="newMeetingDateInput">
+        </div>
+        <div style="display:flex;gap:8px;padding-bottom:1px">
+          <button class="btn btn-primary" onclick="confirmNewMeeting()">Open</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('newMeetingPanel').style.display='none'">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Programs List -->
   <div class="card">
     <div class="card-header">
-      <div class="icon">📚</div>
-      <h2>Meeting History</h2>
-      <button class="btn btn-outline btn-sm" onclick="exportHistoryCsv()" style="margin-left:auto">⬇ Export CSV</button>
+      <div class="icon">📅</div>
+      <h2>Programs</h2>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="exportHistoryCsv()">⬇ Export CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="showNewMeetingPanel()">+ New Program</button>
+      </div>
     </div>
     <div class="card-body">
-      <p class="text-muted" style="margin-bottom:14px">Click <strong>Load</strong> to restore a past program into the builder. Your current form will be replaced.</p>
-      <div id="historyContent"><p class="empty-state">Sign in and join a ward to see meeting history.</p></div>
+      <div id="currentProgramBanner" style="display:none;background:#eff6ff;border:1.5px solid #93c5fd;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:.875rem">
+        <strong>Currently editing:</strong> <span id="currentProgramLabel"></span>
+      </div>
+      <div id="historyContent"><p class="empty-state">Sign in and join a ward to see programs.</p></div>
     </div>
   </div>
 </div>
@@ -1327,7 +1351,8 @@ function toggleBusiness(key) {
   activeBiz[key] = !activeBiz[key];
   document.getElementById(`bi-${key}`).classList.toggle('active', activeBiz[key]);
   document.getElementById(`bc-${key}`).textContent = activeBiz[key] ? '✓' : '';
-  scheduleSave(`business_${key}`, () => collectBusiness(key));
+  const types = key==='stake'?['stake_business']:key==='letters'?['letters_business']:[{releases:'release',sustainings:'sustaining',newrecords:'new_record',blessing:'baby_blessing',apnew:'ap_ordination',apadv:'ap_advancement',childbapt:'child_baptism',convertbapt:'convert_baptism'}[key]];
+  scheduleReplace(`biz_${key}`, types, () => buildBusinessComponents(key));
 }
 
 /* ── Brother/Sister Toggle ───────────────────────────────────── */
@@ -1513,6 +1538,7 @@ function removeProgramItem(id) {
     document.getElementById('programList').appendChild(e);
   }
   updateProgramBadge();
+  scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break'], buildProgramComponents);
 }
 
 function updateProgramBadge() {
@@ -1657,7 +1683,7 @@ function addVisitor() {
   renderVisitorItem(v);
   updateVisitorBadge();
   closeVisitorModal();
-  scheduleSave('visitors', collectVisitors);
+  scheduleReplace('visitors', ['visitor'], buildVisitorComponents);
 }
 
 function renderVisitorItem(v) {
@@ -1696,6 +1722,7 @@ function removeVisitor(id) {
     document.getElementById('visitorList').appendChild(e);
   }
   updateVisitorBadge();
+  scheduleReplace('visitors', ['visitor'], buildVisitorComponents);
 }
 
 function updateVisitorBadge() {
@@ -2294,12 +2321,13 @@ function fillTestMode_DISABLED() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   CLOUD SYNC — Auth, Ward, Save / Load
+   CLOUD SYNC — Auth, Ward, Save / Load, Programs
 ══════════════════════════════════════════════════════════════ */
 const API_URL   = 'https://condscript-api.kylecluff.workers.dev';
 const TOKEN_KEY = 'condscript_jwt';
-let AUTH        = { token: null, email: null, ward: null };
-const saveTimers = {};
+let AUTH             = { token: null, email: null, ward: null };
+let currentMeetingDate = null;   // the date of whichever program is open
+const saveTimers     = {};
 
 // ── API helper ─────────────────────────────────────────────────
 async function api(method, path, body = null) {
@@ -2471,19 +2499,7 @@ async function leaveWard() {
   showWardSetup();
 }
 
-// ── Save ───────────────────────────────────────────────────────
-function scheduleSave(fieldKey, collectFn, delay = 900) {
-  clearTimeout(saveTimers[fieldKey]);
-  saveTimers[fieldKey] = setTimeout(async () => {
-    if (!AUTH.token || !AUTH.ward) return;
-    const date = document.getElementById('meetingDate').value;
-    if (!date) return;
-    const value = collectFn();
-    const result = await api('POST', `/meetings/${date}/field`, { field_key: fieldKey, field_value: value });
-    if (!result.error) showCloudSaved();
-  }, delay);
-}
-
+// ── Save helpers ───────────────────────────────────────────────
 function showCloudSaved() {
   const el = document.getElementById('cloudSaved');
   if (!el) return;
@@ -2492,294 +2508,315 @@ function showCloudSaved() {
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 
-function collectMeta() {
-  return {
-    wardName: document.getElementById('wardName').value,
-    meetingDate: document.getElementById('meetingDate').value,
-    presidingName: document.getElementById('presidingName').value,
-    conductingName: document.getElementById('conductingName').value,
-    fastSunday: document.getElementById('fastSunday').checked,
-    chorister: document.getElementById('chorister').value,
-    organist: document.getElementById('organist').value,
-  };
+function scheduleBatch(key, buildFn, delay = 900) {
+  clearTimeout(saveTimers[key]);
+  saveTimers[key] = setTimeout(async () => {
+    if (!AUTH.token || !AUTH.ward || !currentMeetingDate) return;
+    const result = await api('POST', `/meetings/${currentMeetingDate}/components/batch`, { components: buildFn() });
+    if (!result.error) showCloudSaved();
+  }, delay);
 }
 
-function collectPrayers() {
-  return {
-    invocation:  document.getElementById('invocation').value,
-    benediction: document.getElementById('benediction').value,
-  };
+function scheduleReplace(key, types, buildFn, delay = 900) {
+  clearTimeout(saveTimers[key]);
+  saveTimers[key] = setTimeout(async () => {
+    if (!AUTH.token || !AUTH.ward || !currentMeetingDate) return;
+    const result = await api('POST', `/meetings/${currentMeetingDate}/components/replace-type`, { component_types: types, components: buildFn() });
+    if (!result.error) showCloudSaved();
+  }, delay);
 }
 
-function collectMusic() {
-  return {
-    openingNum:   document.getElementById('openingHymnNum').value,
-    openingTitle: document.getElementById('openingHymnTitle').value,
-    sacNum:       document.getElementById('sacHymnNum').value,
-    sacTitle:     document.getElementById('sacHymnTitle').value,
-    closingNum:   document.getElementById('closingHymnNum').value,
-    closingTitle: document.getElementById('closingHymnTitle').value,
-  };
+// ── Build functions (form → components) ───────────────────────
+function buildMetaComponents() {
+  return [
+    { component_type:'ward_name',  component_key:'ward_name',  notes: g('wardName')||'' },
+    { component_type:'presiding',  component_key:'presiding',  person_name: g('presidingName')||'' },
+    { component_type:'conducting', component_key:'conducting', person_name: g('conductingName')||'' },
+    { component_type:'fast_sunday',component_key:'fast_sunday',extra_data:{value:document.getElementById('fastSunday').checked}},
+    { component_type:'chorister',  component_key:'chorister',  person_name: g('chorister')||'' },
+    { component_type:'organist',   component_key:'organist',   person_name: g('organist')||'' },
+  ];
 }
-
-function collectAnnouncements() {
-  return announcements.map(id => {
-    const el = document.getElementById(`ann-text-${id}`);
-    return el ? el.value : '';
-  }).filter(v => v.trim());
+function buildPrayerComponents() {
+  return [
+    { component_type:'invocation', component_key:'invocation', person_name: g('invocation')||'' },
+    { component_type:'benediction',component_key:'benediction',person_name: g('benediction')||'' },
+  ];
 }
-
-function collectVisitors() { return visitors; }
-
-function collectBusiness(key) {
-  const result = { active: activeBiz[key] };
-  if (key === 'stake') {
-    result.conductor = document.getElementById('stake-conductor')?.value || '';
-  } else if (key === 'letters') {
-    result.details = document.getElementById('letters-details')?.value || '';
-  } else {
-    const tbody = document.querySelector(`#${key}-table tbody`);
-    if (!tbody) return result;
-    result.rows = [...tbody.querySelectorAll('tr[id]')].map(tr => {
-      const id = tr.id.replace('row-', '');
-      const row = { id };
-      // name field (different prefix per table)
-      const nameId = key === 'apnew' ? `ap-name-${id}` : key === 'apadv' ? `adv-name-${id}` : key === 'childbapt' ? `cb-name-${id}` : key === 'convertbapt' ? `cvt-name-${id}` : `name-${id}`;
-      row.name = document.getElementById(nameId)?.value || '';
-      // bs toggle
-      const bsEl = document.getElementById(`bs-${id}`);
-      if (bsEl) row.bs = bsEl.dataset.val || 'Brother';
-      // calling / office
-      if (key === 'releases' || key === 'sustainings') row.col = document.getElementById(`col-${id}`)?.value || '';
-      if (key === 'blessing') { row.child = document.getElementById(`child-${id}`)?.value || ''; row.blesser = document.getElementById(`blesser-${id}`)?.value || ''; delete row.name; }
-      if (key === 'apnew')  row.office = document.getElementById(`ap-office-${id}`)?.value || '';
-      if (key === 'apadv')  row.office = document.getElementById(`adv-office-${id}`)?.value || '';
-      if (key === 'childbapt')   row.date = document.getElementById(`cb-date-${id}`)?.value || '';
-      if (key === 'convertbapt') row.date = document.getElementById(`cvt-date-${id}`)?.value || '';
-      return row;
-    });
-  }
-  return result;
+function buildMusicComponents() {
+  return [
+    { component_type:'opening_hymn',   component_key:'opening_hymn',   hymn_number:g('openingHymnNum'), hymn_title:g('openingHymnTitle') },
+    { component_type:'sacrament_hymn', component_key:'sacrament_hymn', hymn_number:g('sacHymnNum'),     hymn_title:g('sacHymnTitle') },
+    { component_type:'closing_hymn',   component_key:'closing_hymn',   hymn_number:g('closingHymnNum'), hymn_title:g('closingHymnTitle') },
+  ];
 }
-
-function collectProgramOrder() {
-  return programItems.map(item => {
-    const el = document.getElementById(item.id);
-    if (!el) return null;
-    const id = item.id;
-    if (item.type === 'break')   return { type: 'break' };
-    if (item.type === 'speaker') return { type: 'speaker', name: document.getElementById(`pi-name-${id}`)?.value || '', topic: document.getElementById(`pi-topic-${id}`)?.value || '' };
-    if (item.type === 'hymn')    return { type: 'hymn', num: document.getElementById(`pi-hnum-${id}`)?.value || '', title: document.getElementById(`pi-htitle-${id}`)?.value || '' };
-    return null;
+function buildAnnouncementComponents() {
+  return announcements.map((id, i) => ({
+    component_type:'announcement', component_key:`announcement:${i}`, component_order:i,
+    notes: document.getElementById(`ann-text-${id}`)?.value || '',
+  })).filter(c => c.notes.trim());
+}
+function buildVisitorComponents() {
+  return visitors.map((v, i) => ({
+    component_type:'visitor', component_key:`visitor:${i}`, component_order:i,
+    person_name: v.name || '',
+    extra_data: { callingVal:v.callingVal, info:v.info, recognized:v.recognized, hcOnAssignment:v.hcOnAssignment },
+  }));
+}
+function buildBusinessComponents(key) {
+  if (key === 'stake')   return [{ component_type:'stake_business',   component_key:'stake_business',   extra_data:{ active:activeBiz['stake'],   conductor: document.getElementById('stake-conductor')?.value||'' }}];
+  if (key === 'letters') return [{ component_type:'letters_business', component_key:'letters_business', extra_data:{ active:activeBiz['letters'], details:   document.getElementById('letters-details')?.value||'' }}];
+  const typeMap = { releases:'release',sustainings:'sustaining',newrecords:'new_record',blessing:'baby_blessing',apnew:'ap_ordination',apadv:'ap_advancement',childbapt:'child_baptism',convertbapt:'convert_baptism' };
+  const compType = typeMap[key]; if (!compType) return [];
+  const tbody = document.querySelector(`#${key}-table tbody`); if (!tbody) return [];
+  return [...tbody.querySelectorAll('tr[id]')].map((tr, i) => {
+    const id = tr.id.replace('row-','');
+    const c = { component_type:compType, component_key:`${compType}:${i}`, component_order:i };
+    if (key==='releases'||key==='sustainings') { c.person_name=document.getElementById(`name-${id}`)?.value||''; c.person_title=document.getElementById(`bs-${id}`)?.dataset.val||'Brother'; c.notes=document.getElementById(`col-${id}`)?.value||''; }
+    else if (key==='newrecords') { c.person_name=document.getElementById(`name-${id}`)?.value||''; c.person_title=document.getElementById(`bs-${id}`)?.dataset.val||'Brother'; }
+    else if (key==='blessing')    { c.extra_data={ child:document.getElementById(`child-${id}`)?.value||'', blesser:document.getElementById(`blesser-${id}`)?.value||'' }; }
+    else if (key==='apnew')       { c.person_name=document.getElementById(`ap-name-${id}`)?.value||''; c.extra_data={office:document.getElementById(`ap-office-${id}`)?.value||'Deacon'}; }
+    else if (key==='apadv')       { c.person_name=document.getElementById(`adv-name-${id}`)?.value||''; c.extra_data={office:document.getElementById(`adv-office-${id}`)?.value||'Teacher'}; }
+    else if (key==='childbapt')   { c.person_name=document.getElementById(`cb-name-${id}`)?.value||''; c.person_title=document.getElementById(`bs-${id}`)?.dataset.val||'Brother'; c.extra_data={date:document.getElementById(`cb-date-${id}`)?.value||''}; }
+    else if (key==='convertbapt') { c.person_name=document.getElementById(`cvt-name-${id}`)?.value||''; c.person_title=document.getElementById(`bs-${id}`)?.dataset.val||'Brother'; c.extra_data={date:document.getElementById(`cvt-date-${id}`)?.value||''}; }
+    return c;
+  });
+}
+function buildProgramComponents() {
+  const typeMap = { speaker:'talk', hymn:'intermediate_hymn', break:'conduction_break' };
+  return programItems.map((item, i) => {
+    const el = document.getElementById(item.id); if (!el) return null;
+    const ct = typeMap[item.type];
+    const c = { component_type:ct, component_key:`${ct}:${i}`, component_order:i };
+    if (item.type==='speaker') { c.person_name=document.getElementById(`pi-name-${item.id}`)?.value||''; c.topic=document.getElementById(`pi-topic-${item.id}`)?.value||''; }
+    if (item.type==='hymn')    { c.hymn_number=document.getElementById(`pi-hnum-${item.id}`)?.value||''; c.hymn_title=document.getElementById(`pi-htitle-${item.id}`)?.value||''; }
+    return c;
   }).filter(Boolean);
 }
 
-// ── Load ───────────────────────────────────────────────────────
-async function loadLatestMeeting() {
+// ── Load: components → form ────────────────────────────────────
+function setV(id, val)    { const el = document.getElementById(id); if (el && val != null) el.value = val; }
+function setBsT(id, title){ const b = document.getElementById(`bs-${id}`); if (!b||!title) return; b.dataset.val=title; b.querySelectorAll('.bs-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.trim().startsWith(title==='Brother'?'Bro':'Sis'))); }
+
+function loadMeetingFromComponents(components, date) {
+  if (!components) return;
+  const byKey = {}; const byType = {};
+  components.forEach(c => { byKey[c.component_key]=c; (byType[c.component_type]=byType[c.component_type]||[]).push(c); });
+  Object.values(byType).forEach(arr => arr.sort((a,b)=>a.component_order-b.component_order));
+
+  // Single-value
+  if (byKey['ward_name'])     document.getElementById('wardName').value       = byKey['ward_name'].notes     || '';
+  if (byKey['presiding'])     document.getElementById('presidingName').value  = byKey['presiding'].person_name || '';
+  if (byKey['conducting'])    document.getElementById('conductingName').value = byKey['conducting'].person_name || '';
+  if (byKey['chorister'])     document.getElementById('chorister').value      = byKey['chorister'].person_name || '';
+  if (byKey['organist'])      document.getElementById('organist').value       = byKey['organist'].person_name  || '';
+  if (byKey['invocation'])    document.getElementById('invocation').value     = byKey['invocation'].person_name || '';
+  if (byKey['benediction'])   document.getElementById('benediction').value    = byKey['benediction'].person_name || '';
+  if (byKey['fast_sunday'])   { document.getElementById('fastSunday').checked = byKey['fast_sunday'].extra_data?.value||false; onFastSundayChange(); }
+  if (byKey['opening_hymn'])  { setV('openingHymnNum',byKey['opening_hymn'].hymn_number); setV('openingHymnTitle',byKey['opening_hymn'].hymn_title); }
+  if (byKey['sacrament_hymn']){ setV('sacHymnNum',byKey['sacrament_hymn'].hymn_number);   setV('sacHymnTitle',byKey['sacrament_hymn'].hymn_title); }
+  if (byKey['closing_hymn'])  { setV('closingHymnNum',byKey['closing_hymn'].hymn_number); setV('closingHymnTitle',byKey['closing_hymn'].hymn_title); }
+
+  // Announcements
+  if (byType['announcement']?.length) {
+    document.getElementById('announcementList').innerHTML=''; announcements=[];
+    byType['announcement'].forEach(c => { addAnnouncement(); const el = document.getElementById(`ann-text-${announcements[announcements.length-1]}`); if (el) el.value=c.notes||''; });
+  }
+  if (!announcements.length) addAnnouncement();
+
+  // Visitors
+  visitors=[]; const vl=document.getElementById('visitorList'); vl.innerHTML='';
+  const ve=document.createElement('div'); ve.id='visitorEmpty'; ve.className='empty-state'; ve.textContent='No visitors added.'; vl.appendChild(ve);
+  (byType['visitor']||[]).forEach(c => { if (c.extra_data) { const v={...c.extra_data,name:c.person_name,id:Date.now()+Math.random()}; visitors.push(v); renderVisitorItem(v); } });
+  updateVisitorBadge();
+
+  // Business — stake & letters
+  if (byKey['stake_business'])   { const d=byKey['stake_business'].extra_data||{}; if (!!d.active!==!!activeBiz['stake']) toggleBusiness('stake'); if(d.conductor) document.getElementById('stake-conductor').value=d.conductor; }
+  if (byKey['letters_business']) { const d=byKey['letters_business'].extra_data||{}; if (!!d.active!==!!activeBiz['letters']) toggleBusiness('letters'); if(d.details) document.getElementById('letters-details').value=d.details; }
+
+  // Business — table items
+  const bizMap=[
+    {type:'release',bk:'releases',add:()=>addPersonRow('releases','calling'),set:(id,c)=>{setV(`name-${id}`,c.person_name);setBsT(id,c.person_title);setV(`col-${id}`,c.notes);}},
+    {type:'sustaining',bk:'sustainings',add:()=>addPersonRow('sustainings','calling'),set:(id,c)=>{setV(`name-${id}`,c.person_name);setBsT(id,c.person_title);setV(`col-${id}`,c.notes);}},
+    {type:'new_record',bk:'newrecords',add:()=>addPersonRow('newrecords','none'),set:(id,c)=>{setV(`name-${id}`,c.person_name);setBsT(id,c.person_title);}},
+    {type:'baby_blessing',bk:'blessing',add:addBlessingRow,set:(id,c)=>{setV(`child-${id}`,c.extra_data?.child);setV(`blesser-${id}`,c.extra_data?.blesser);}},
+    {type:'ap_ordination',bk:'apnew',add:addApRow,set:(id,c)=>{setV(`ap-name-${id}`,c.person_name);setV(`ap-office-${id}`,c.extra_data?.office);}},
+    {type:'ap_advancement',bk:'apadv',add:addAdvRow,set:(id,c)=>{setV(`adv-name-${id}`,c.person_name);setV(`adv-office-${id}`,c.extra_data?.office);}},
+    {type:'child_baptism',bk:'childbapt',add:addChildBaptRow,set:(id,c)=>{setV(`cb-name-${id}`,c.person_name);setBsT(id,c.person_title);setV(`cb-date-${id}`,c.extra_data?.date);}},
+    {type:'convert_baptism',bk:'convertbapt',add:addConvertBaptRow,set:(id,c)=>{setV(`cvt-name-${id}`,c.person_name);setBsT(id,c.person_title);setV(`cvt-date-${id}`,c.extra_data?.date);}},
+  ];
+  bizMap.forEach(({type,bk,add,set}) => {
+    const comps=byType[type]; if (!comps?.length) return;
+    if (!activeBiz[bk]) toggleBusiness(bk);
+    const tb=document.querySelector(`#${bk}-table tbody`); if (tb) tb.innerHTML='';
+    comps.forEach(c => { add(); const tb2=document.querySelector(`#${bk}-table tbody`); const tr=tb2?.lastElementChild; if (!tr) return; const id=tr.id.replace('row-',''); set(id,c); });
+  });
+
+  // Program order
+  const progComps=components.filter(c=>['talk','intermediate_hymn','conduction_break'].includes(c.component_type)).sort((a,b)=>a.component_order-b.component_order);
+  if (progComps.length) {
+    programItems=[]; document.getElementById('programList').innerHTML='';
+    const em=document.createElement('div'); em.id='programEmpty'; em.className='empty-state'; em.textContent='No program items yet.'; document.getElementById('programList').appendChild(em);
+    const tm={talk:'speaker',intermediate_hymn:'hymn',conduction_break:'break'};
+    progComps.forEach(c => addProgramItem(tm[c.component_type],{name:c.person_name,topic:c.topic,num:c.hymn_number,title:c.hymn_title}));
+  }
+
+  // Config
+  if (byKey['config']?.extra_data) { Object.assign(CONFIG,byKey['config'].extra_data); saveConfig(); }
+
+  // Update meeting date display
+  if (date) document.getElementById('meetingDate').value = date;
+  currentMeetingDate = date;
+  updateCurrentProgramBanner();
+}
+
+// ── Load meeting from server ───────────────────────────────────
+async function loadMeetingByDate(date) {
   if (!AUTH.token || !AUTH.ward) return;
+  const result = await api('GET', `/meetings/${date}`);
+  if (result.error) return;
+  if (result.meeting?.components) {
+    loadMeetingFromComponents(result.meeting.components, date);
+  } else {
+    // No data yet — just set the date and clear the form
+    clearFormForNewMeeting(date);
+  }
+}
+
+async function loadLatestMeeting() {
   const date = document.getElementById('meetingDate').value;
   if (!date) return;
-  const result = await api('GET', `/meetings/${date}`);
-  if (result.error || !result.meeting) return;
-  loadMeeting(result.meeting.program);
+  currentMeetingDate = date;
+  await loadMeetingByDate(date);
 }
 
-function loadMeeting(prog) {
-  if (!prog) return;
-
-  if (prog.meta) {
-    const m = prog.meta;
-    if (m.wardName      != null) document.getElementById('wardName').value       = m.wardName;
-    if (m.presidingName != null) document.getElementById('presidingName').value  = m.presidingName;
-    if (m.conductingName!= null) document.getElementById('conductingName').value = m.conductingName;
-    if (m.chorister     != null) document.getElementById('chorister').value      = m.chorister;
-    if (m.organist      != null) document.getElementById('organist').value       = m.organist;
-    if (m.fastSunday    != null) { document.getElementById('fastSunday').checked = m.fastSunday; onFastSundayChange(); }
-  }
-
-  if (prog.prayers) {
-    if (prog.prayers.invocation  != null) document.getElementById('invocation').value  = prog.prayers.invocation;
-    if (prog.prayers.benediction != null) document.getElementById('benediction').value = prog.prayers.benediction;
-  }
-
-  if (prog.music) {
-    const mu = prog.music;
-    if (mu.openingNum   != null) document.getElementById('openingHymnNum').value   = mu.openingNum;
-    if (mu.openingTitle != null) document.getElementById('openingHymnTitle').value = mu.openingTitle;
-    if (mu.sacNum       != null) document.getElementById('sacHymnNum').value       = mu.sacNum;
-    if (mu.sacTitle     != null) document.getElementById('sacHymnTitle').value     = mu.sacTitle;
-    if (mu.closingNum   != null) document.getElementById('closingHymnNum').value   = mu.closingNum;
-    if (mu.closingTitle != null) document.getElementById('closingHymnTitle').value = mu.closingTitle;
-  }
-
-  if (Array.isArray(prog.announcements)) {
-    document.getElementById('announcementList').innerHTML = '';
-    announcements = [];
-    prog.announcements.forEach(text => {
-      addAnnouncement();
-      const el = document.getElementById(`ann-text-${announcements[announcements.length-1]}`);
-      if (el) el.value = text;
-    });
-    if (!announcements.length) addAnnouncement();
-  }
-
-  if (Array.isArray(prog.visitors)) {
-    visitors = [];
-    const list = document.getElementById('visitorList');
-    list.innerHTML = '';
-    const empty = document.createElement('div');
-    empty.id = 'visitorEmpty'; empty.className = 'empty-state'; empty.textContent = 'No visitors added.';
-    list.appendChild(empty);
-    prog.visitors.forEach(v => { visitors.push(v); renderVisitorItem(v); });
-    updateVisitorBadge();
-  }
-
-  const bizKeys = ['stake','releases','sustainings','letters','newrecords','blessing','apnew','apadv','childbapt','convertbapt'];
-  bizKeys.forEach(key => {
-    const data = prog[`business_${key}`];
-    if (!data) return;
-    if (!!data.active !== !!activeBiz[key]) toggleBusiness(key);
-    loadBizData(key, data);
-  });
-
-  if (Array.isArray(prog.program_order)) {
-    programItems = [];
-    document.getElementById('programList').innerHTML = '';
-    const empty = document.createElement('div');
-    empty.id = 'programEmpty'; empty.className = 'empty-state'; empty.textContent = 'No program items yet.';
-    document.getElementById('programList').appendChild(empty);
-    prog.program_order.forEach(item => addProgramItem(item.type, item));
-    updateProgramBadge();
-  }
-
-  if (prog.config && typeof prog.config === 'object') { Object.assign(CONFIG, prog.config); saveConfig(); }
+function clearFormForNewMeeting(date) {
+  // Reset dynamic lists but keep config
+  announcements=[]; document.getElementById('announcementList').innerHTML=''; addAnnouncement();
+  visitors=[]; document.getElementById('visitorList').innerHTML=''; const ve=document.createElement('div'); ve.id='visitorEmpty'; ve.className='empty-state'; ve.textContent='No visitors added.'; document.getElementById('visitorList').appendChild(ve); updateVisitorBadge();
+  programItems=[]; document.getElementById('programList').innerHTML=''; const pe=document.createElement('div'); pe.id='programEmpty'; pe.className='empty-state'; pe.textContent='No program items yet.'; document.getElementById('programList').appendChild(pe); updateProgramBadge();
+  ['releases','sustainings','newrecords','blessing','apnew','apadv','childbapt','convertbapt'].forEach(k => { const tb=document.querySelector(`#${k}-table tbody`); if(tb) tb.innerHTML=''; if(activeBiz[k]) toggleBusiness(k); });
+  if (activeBiz['stake']) toggleBusiness('stake');
+  if (activeBiz['letters']) toggleBusiness('letters');
+  ['presidingName','conductingName','chorister','organist','invocation','benediction','openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('fastSunday').checked=false; onFastSundayChange();
+  document.getElementById('stake-conductor').value='';
+  document.getElementById('letters-details').value='';
+  document.getElementById('meetingDate').value = date;
+  currentMeetingDate = date;
+  updateCurrentProgramBanner();
 }
 
-function loadBizData(key, data) {
-  if (key === 'stake') { if (data.conductor) document.getElementById('stake-conductor').value = data.conductor; return; }
-  if (key === 'letters') { if (data.details) document.getElementById('letters-details').value = data.details; return; }
-  if (!Array.isArray(data.rows)) return;
-
-  const tbody = document.querySelector(`#${key}-table tbody`);
-  if (tbody) tbody.innerHTML = '';
-
-  const addMap = {
-    releases:    () => addPersonRow('releases','calling'),
-    sustainings: () => addPersonRow('sustainings','calling'),
-    newrecords:  () => addPersonRow('newrecords','none'),
-    blessing:    addBlessingRow,
-    apnew:       addApRow,
-    apadv:       addAdvRow,
-    childbapt:   addChildBaptRow,
-    convertbapt: addConvertBaptRow,
-  };
-
-  data.rows.forEach(row => {
-    if (addMap[key]) addMap[key]();
-    const tbody2 = document.querySelector(`#${key}-table tbody`);
-    const lastTr = tbody2?.lastElementChild;
-    if (!lastTr) return;
-    const id = lastTr.id.replace('row-', '');
-
-    const setVal = (elId, val) => { const el = document.getElementById(elId); if (el && val != null) el.value = val; };
-    const setBsVal = (val) => {
-      const bsEl = document.getElementById(`bs-${id}`);
-      if (!bsEl || !val) return;
-      bsEl.dataset.val = val;
-      bsEl.querySelectorAll('.bs-btn').forEach(b => b.classList.toggle('active', b.textContent.trim().startsWith(val === 'Brother' ? 'Bro' : 'Sis')));
-    };
-
-    if (key === 'releases' || key === 'sustainings' || key === 'newrecords') {
-      setVal(`name-${id}`, row.name); setBsVal(row.bs);
-      if (row.col) setVal(`col-${id}`, row.col);
-    } else if (key === 'blessing') {
-      setVal(`child-${id}`, row.child); setVal(`blesser-${id}`, row.blesser);
-    } else if (key === 'apnew') {
-      setVal(`ap-name-${id}`, row.name); setVal(`ap-office-${id}`, row.office);
-    } else if (key === 'apadv') {
-      setVal(`adv-name-${id}`, row.name); setVal(`adv-office-${id}`, row.office);
-    } else if (key === 'childbapt') {
-      setVal(`cb-name-${id}`, row.name); setBsVal(row.bs); setVal(`cb-date-${id}`, row.date);
-    } else if (key === 'convertbapt') {
-      setVal(`cvt-name-${id}`, row.name); setBsVal(row.bs); setVal(`cvt-date-${id}`, row.date);
-    }
-  });
+function updateCurrentProgramBanner() {
+  const banner = document.getElementById('currentProgramBanner');
+  const label  = document.getElementById('currentProgramLabel');
+  if (!banner || !label) return;
+  if (currentMeetingDate) {
+    const d = new Date(currentMeetingDate + 'T12:00:00');
+    label.textContent = d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    banner.style.display = '';
+  } else {
+    banner.style.display = 'none';
+  }
 }
 
 // ── Save hooks ─────────────────────────────────────────────────
 function initSaveHooks() {
-  const metaIds    = ['wardName','meetingDate','presidingName','conductingName','fastSunday','chorister','organist'];
-  const prayerIds  = ['invocation','benediction'];
-  const musicIds   = ['openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
+  const metaIds   = ['wardName','meetingDate','presidingName','conductingName','fastSunday','chorister','organist'];
+  const prayerIds = ['invocation','benediction'];
+  const musicIds  = ['openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
 
-  metaIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.addEventListener('input',  () => scheduleSave('meta',    collectMeta));
-              el.addEventListener('change', () => scheduleSave('meta',    collectMeta)); }
-  });
-  prayerIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.addEventListener('input',  () => scheduleSave('prayers', collectPrayers));
-              el.addEventListener('change', () => scheduleSave('prayers', collectPrayers)); }
-  });
-  musicIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.addEventListener('input',  () => scheduleSave('music',   collectMusic));
-              el.addEventListener('change', () => scheduleSave('music',   collectMusic)); }
-  });
+  metaIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleBatch('meta',buildMetaComponents))); });
+  prayerIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleBatch('prayers',buildPrayerComponents))); });
+  musicIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleBatch('music',buildMusicComponents))); });
 
-  document.getElementById('announcementList').addEventListener('input', () => scheduleSave('announcements', collectAnnouncements));
+  document.getElementById('announcementList').addEventListener('input', ()=>scheduleReplace('ann',['announcement'],buildAnnouncementComponents));
 
   ['stake','releases','sustainings','letters','newrecords','blessing','apnew','apadv','childbapt','convertbapt'].forEach(key => {
-    const el = document.getElementById(`bi-${key}`);
-    if (el) { el.addEventListener('input',  () => scheduleSave(`business_${key}`, () => collectBusiness(key)));
-              el.addEventListener('change', () => scheduleSave(`business_${key}`, () => collectBusiness(key))); }
+    const el=document.getElementById(`bi-${key}`); if (!el) return;
+    const types = key==='stake'?['stake_business']:key==='letters'?['letters_business']:[{releases:'release',sustainings:'sustaining',newrecords:'new_record',blessing:'baby_blessing',apnew:'ap_ordination',apadv:'ap_advancement',childbapt:'child_baptism',convertbapt:'convert_baptism'}[key]];
+    ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleReplace(`biz_${key}`,types,()=>buildBusinessComponents(key))));
   });
 
-  document.getElementById('programList').addEventListener('input', () => scheduleSave('program_order', collectProgramOrder));
+  document.getElementById('programList').addEventListener('input', ()=>scheduleReplace('prog',['talk','intermediate_hymn','conduction_break'],buildProgramComponents));
 }
 
-// ── History tab ────────────────────────────────────────────────
+// ── Programs tab ───────────────────────────────────────────────
+function showNewMeetingPanel() {
+  const panel = document.getElementById('newMeetingPanel');
+  panel.style.display = '';
+  // Default to next Sunday
+  const today = new Date();
+  const diff = today.getDay() === 0 ? 7 : 7 - today.getDay();
+  today.setDate(today.getDate() + diff);
+  document.getElementById('newMeetingDateInput').value = today.toISOString().split('T')[0];
+}
+
+async function confirmNewMeeting() {
+  const date = document.getElementById('newMeetingDateInput').value;
+  if (!date) { alert('Please select a date.'); return; }
+
+  // Check if meeting already exists
+  const existing = await api('GET', `/meetings/${date}`);
+  if (existing.meeting?.components?.length) {
+    if (!confirm(`A program already exists for ${date}. Open it anyway? (Your unsaved changes to the current program will be lost.)`)) return;
+  }
+
+  document.getElementById('newMeetingPanel').style.display = 'none';
+  await navigateToMeeting(date);
+}
+
+async function navigateToMeeting(date) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const meetDate = new Date(date + 'T12:00:00');
+  const isPast = meetDate < today;
+
+  if (isPast && date !== currentMeetingDate) {
+    const fmt = meetDate.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    if (!confirm(`${fmt} is in the past. Edit this program anyway?`)) return;
+  }
+
+  await loadMeetingByDate(date);
+  switchTab('builder');
+  loadHistoryTab(); // refresh the programs list to highlight the new current
+}
+
 async function loadHistoryTab() {
   if (!AUTH.token || !AUTH.ward) {
-    document.getElementById('historyContent').innerHTML = '<p class="empty-state">Sign in and join a ward to see history.</p>';
+    document.getElementById('historyContent').innerHTML = '<p class="empty-state">Sign in and join a ward to see programs.</p>';
     return;
   }
   document.getElementById('historyContent').innerHTML = '<p style="text-align:center;color:var(--gray-400);padding:20px">Loading…</p>';
   const result = await api('GET', '/meetings?limit=52');
   if (result.error) { document.getElementById('historyContent').innerHTML = `<p style="color:var(--red)">${escHtml(result.error)}</p>`; return; }
   const meetings = result.meetings || [];
-  if (!meetings.length) { document.getElementById('historyContent').innerHTML = '<p class="empty-state">No meetings saved yet.</p>'; return; }
+  if (!meetings.length) { document.getElementById('historyContent').innerHTML = '<p class="empty-state">No programs saved yet. Fill in a program and it will appear here.</p>'; return; }
+
+  const today = new Date(); today.setHours(0,0,0,0);
   document.getElementById('historyContent').innerHTML = meetings.map(m => {
     const d = new Date(m.meeting_date + 'T12:00:00');
     const fmt = d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    return `<div class="history-item">
-      <div style="flex:1"><div class="history-item-date">${escHtml(fmt)}</div><div class="history-item-meta">Saved by ${escHtml(m.saved_by||'unknown')}</div></div>
-      <button class="btn btn-outline btn-sm" onclick="loadHistoryMeeting('${m.meeting_date}')">Load</button>
+    const isCurrent = m.meeting_date === currentMeetingDate;
+    const isPast = d < today;
+    return `<div class="history-item" style="${isCurrent?'border-color:var(--navy);background:#eff6ff;':''}">
+      <div style="flex:1">
+        <div class="history-item-date">${escHtml(fmt)}${isCurrent?' <span style="font-size:.7rem;background:var(--navy);color:white;padding:1px 7px;border-radius:8px;margin-left:6px;vertical-align:middle">OPEN</span>':''}</div>
+        <div class="history-item-meta">${isPast?'📅 Past meeting':'📋 Upcoming'}</div>
+      </div>
+      ${isCurrent
+        ? '<span style="font-size:.8rem;color:var(--navy);font-weight:600">Currently editing</span>'
+        : `<button class="btn btn-outline btn-sm" onclick="navigateToMeeting('${m.meeting_date}')">Open</button>`}
     </div>`;
   }).join('');
 }
 
-async function loadHistoryMeeting(date) {
-  if (!confirm(`Load the program from ${date}? This will replace your current form.`)) return;
-  const result = await api('GET', `/meetings/${date}`);
-  if (result.error || !result.meeting) { alert('Could not load that meeting.'); return; }
-  switchTab('builder');
-  document.getElementById('meetingDate').value = date;
-  loadMeeting(result.meeting.program);
-}
-
 async function exportHistoryCsv() {
   if (!AUTH.token || !AUTH.ward) { alert('Sign in to export.'); return; }
-  const res = await fetch(API_URL + '/meetings/export.csv', {
-    headers: { 'Authorization': `Bearer ${AUTH.token}` }
-  });
+  const res = await fetch(API_URL + '/meetings/export.csv', { headers:{ 'Authorization':`Bearer ${AUTH.token}` } });
   if (!res.ok) { alert('Export failed.'); return; }
-  const text = await res.text();
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
-  a.download = 'condscript-history.csv';
-  a.click();
+  a.href = URL.createObjectURL(new Blob([await res.text()], {type:'text/csv'}));
+  a.download = 'condscript-programs.csv'; a.click();
 }
 </script>
 </body>
