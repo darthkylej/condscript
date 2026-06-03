@@ -2686,6 +2686,8 @@ async function loadLatestMeeting() {
 }
 
 function clearFormForNewMeeting(date) {
+  _suppressSaves = true;
+  currentMeetingDate = date;
   // Reset dynamic lists but keep config
   announcements=[]; document.getElementById('announcementList').innerHTML=''; addAnnouncement();
   visitors=[]; document.getElementById('visitorList').innerHTML=''; const ve=document.createElement('div'); ve.id='visitorEmpty'; ve.className='empty-state'; ve.textContent='No visitors added.'; document.getElementById('visitorList').appendChild(ve); updateVisitorBadge();
@@ -2698,7 +2700,7 @@ function clearFormForNewMeeting(date) {
   document.getElementById('stake-conductor').value='';
   document.getElementById('letters-details').value='';
   document.getElementById('meetingDate').value = date;
-  currentMeetingDate = date;
+  _suppressSaves = false;
   updateCurrentProgramBanner();
 }
 
@@ -2769,11 +2771,21 @@ async function navigateToMeeting(date) {
     if (!confirm(`${fmt} is in the past. Edit this program anyway?`)) return;
   }
 
-  // Cancel any pending saves from the previous meeting before loading
+  // Cancel pending saves, set date immediately, switch to builder right away
+  // so the user sees immediate feedback rather than waiting for the API
   Object.keys(saveTimers).forEach(k => clearTimeout(saveTimers[k]));
-
-  await loadMeetingByDate(date);
+  currentMeetingDate = date;
+  document.getElementById('meetingDate').value = date;
+  updateCurrentProgramBanner();
   switchTab('builder');
+
+  // Load program data in the background
+  try {
+    await loadMeetingByDate(date);
+  } catch(e) {
+    console.error('loadMeetingByDate failed:', e);
+  }
+
   loadHistoryTab();
 }
 
