@@ -1090,8 +1090,6 @@ const DEFAULT_PHRASES = {
   // ── Program Items ─────────────────────────────────────
   speakerIntro:
     'Our {ordinal} speaker is {name}.',
-  speakerIntroWithTopic:
-    'Our {ordinal} speaker is {name}. The topic today is "{topic}".',
 };
 
 // Descriptions for the config UI
@@ -1153,8 +1151,7 @@ const PHRASE_CONFIG = [
   { section:'Sacrament', key:'afterSacrament', label:'After Sacrament',              rows:2, tokens:'No tokens' },
 
   // ── Program — Speakers ────────────────────────────────────
-  { section:'Program — Speakers', key:'speakerIntro',          label:'Speaker Introduction',            rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
-  { section:'Program — Speakers', key:'speakerIntroWithTopic', label:'Speaker Introduction with Topic', rows:2, tokens:'{ordinal}, {name}, {topic}' },
+  { section:'Program — Speakers', key:'speakerIntro', label:'Speaker Introduction', rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
 
   // ── Program — Hymns ───────────────────────────────────────
   { section:'Program — Hymns', key:'intermediateHymnIntro', label:'Intermediate Hymn Introduction', rows:2,
@@ -1490,7 +1487,6 @@ function addProgramItem(type, preload = null) {
        <span class="item-type-label">Speaker</span>
        <div class="item-fields">
          <input type="text" placeholder="Speaker name" id="pi-name-${id}">
-         <input type="text" placeholder="Topic (optional)" id="pi-topic-${id}" style="flex:1.5">
        </div>
        <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
     : type === 'hymn'
@@ -1511,8 +1507,7 @@ function addProgramItem(type, preload = null) {
   // Pre-fill values if loading from saved data
   if (preload) {
     if (type === 'speaker') {
-      if (preload.name)  document.getElementById(`pi-name-${id}`).value  = preload.name;
-      if (preload.topic) document.getElementById(`pi-topic-${id}`).value = preload.topic;
+      if (preload.name) document.getElementById(`pi-name-${id}`).value = preload.name;
     } else if (type === 'hymn') {
       if (preload.num)   document.getElementById(`pi-hnum-${id}`).value  = preload.num;
       if (preload.title) document.getElementById(`pi-htitle-${id}`).value = preload.title;
@@ -2032,11 +2027,10 @@ function generateScript() {
       if (el.classList.contains('speaker')) {
         const name  = (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
         if (!name) return; // skip empty speakers
-        const topic = (document.getElementById(`pi-topic-${el.id}`)?.value || '').trim();
         const isLast = el === lastSpeakerEl;
         const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
         speakerCount++;
-        html += say(ph(topic ? 'speakerIntroWithTopic' : 'speakerIntro', { ordinal, name, topic }));
+        html += say(ph('speakerIntro', { ordinal, name }));
       } else if (el.classList.contains('hymn')) {
         const hnum   = (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim();
         const htitle = (document.getElementById(`pi-htitle-${el.id}`)?.value || '').trim();
@@ -2296,8 +2290,7 @@ function fillTestMode_DISABLED() {
   addProgramItem('speaker');
   let el = document.querySelector('.program-item.speaker:last-of-type') ||
            [...document.querySelectorAll('.program-item.speaker')].at(-1);
-  document.getElementById(`pi-name-${el.id}`).value  = 'Sister Rachel Jensen';
-  document.getElementById(`pi-topic-${el.id}`).value = 'The Power of Daily Scripture Study';
+  document.getElementById(`pi-name-${el.id}`).value = 'Sister Rachel Jensen';
 
   // Conduction break before intermediate hymn
   addProgramItem('break');
@@ -2314,8 +2307,7 @@ function fillTestMode_DISABLED() {
   // Concluding speaker (male) — immediately after break → "now"
   addProgramItem('speaker');
   el = [...document.querySelectorAll('.program-item.speaker')].at(-1);
-  document.getElementById(`pi-name-${el.id}`).value  = 'Brother Daniel Reyes';
-  document.getElementById(`pi-topic-${el.id}`).value = 'Covenant Keeping in Modern Times';
+  document.getElementById(`pi-name-${el.id}`).value = 'Brother Daniel Reyes';
 
   updateProgramBadge();
 }
@@ -2325,9 +2317,10 @@ function fillTestMode_DISABLED() {
 ══════════════════════════════════════════════════════════════ */
 const API_URL   = 'https://condscript-api.kylecluff.workers.dev';
 const TOKEN_KEY = 'condscript_jwt';
-let AUTH             = { token: null, email: null, ward: null };
+let AUTH               = { token: null, email: null, ward: null };
 let currentMeetingDate = null;   // the date of whichever program is open
-const saveTimers     = {};
+let _suppressSaves     = false;  // true while loading — prevents saves firing during load
+const saveTimers       = {};
 
 // ── API helper ─────────────────────────────────────────────────
 async function api(method, path, body = null) {
@@ -2510,6 +2503,7 @@ function showCloudSaved() {
 
 // Metadata → PATCH to meetings table columns
 function schedulePatchMetadata(delay = 900) {
+  if (_suppressSaves) return;
   clearTimeout(saveTimers['meta']);
   saveTimers['meta'] = setTimeout(async () => {
     if (!AUTH.token || !AUTH.ward || !currentMeetingDate) return;
@@ -2520,6 +2514,7 @@ function schedulePatchMetadata(delay = 900) {
 
 // Ordered components → replace-type in meeting_components table
 function scheduleReplace(key, types, buildFn, delay = 900) {
+  if (_suppressSaves) return;
   clearTimeout(saveTimers[key]);
   saveTimers[key] = setTimeout(async () => {
     if (!AUTH.token || !AUTH.ward || !currentMeetingDate) return;
@@ -2586,7 +2581,7 @@ function buildProgramComponents() {
   return programItems.map((item, i) => {
     const el = document.getElementById(item.id); if (!el) return null;
     const c = { component_type:typeMap[item.type], component_order:i };
-    if (item.type==='speaker') { c.person_name=document.getElementById(`pi-name-${item.id}`)?.value||''; c.topic=document.getElementById(`pi-topic-${item.id}`)?.value||''; }
+    if (item.type==='speaker') { c.person_name=document.getElementById(`pi-name-${item.id}`)?.value||''; }
     if (item.type==='hymn')    { c.hymn_number=document.getElementById(`pi-hnum-${item.id}`)?.value||''; c.hymn_title=document.getElementById(`pi-htitle-${item.id}`)?.value||''; }
     return c;
   }).filter(Boolean);
@@ -2597,6 +2592,10 @@ function setV(id, val)    { const el = document.getElementById(id); if (el && va
 function setBsT(id, title){ const b = document.getElementById(`bs-${id}`); if (!b||!title) return; b.dataset.val=title; b.querySelectorAll('.bs-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.trim().startsWith(title==='Brother'?'Bro':'Sis'))); }
 
 function loadMeetingFromComponents(components, date, metadata) {
+  // Suppress auto-saves and set date immediately — prevents saves firing on the wrong meeting
+  _suppressSaves = true;
+  currentMeetingDate = date;
+  document.getElementById('meetingDate').value = date || '';
   // Load metadata (from meetings table columns)
   if (metadata) {
     const m = metadata;
@@ -2657,15 +2656,13 @@ function loadMeetingFromComponents(components, date, metadata) {
     programItems=[]; document.getElementById('programList').innerHTML='';
     const em=document.createElement('div'); em.id='programEmpty'; em.className='empty-state'; em.textContent='No program items yet.'; document.getElementById('programList').appendChild(em);
     const tm={talk:'speaker',intermediate_hymn:'hymn',conduction_break:'break'};
-    progComps.forEach(c => addProgramItem(tm[c.component_type],{name:c.person_name,topic:c.topic,num:c.hymn_number,title:c.hymn_title}));
+    progComps.forEach(c => addProgramItem(tm[c.component_type],{name:c.person_name,num:c.hymn_number,title:c.hymn_title}));
   }
 
   // Config
   if (byKey['config']?.extra_data) { Object.assign(CONFIG,byKey['config'].extra_data); saveConfig(); }
 
-  // Update meeting date display
-  if (date) document.getElementById('meetingDate').value = date;
-  currentMeetingDate = date;
+  _suppressSaves = false;
   updateCurrentProgramBanner();
 }
 
@@ -2772,9 +2769,12 @@ async function navigateToMeeting(date) {
     if (!confirm(`${fmt} is in the past. Edit this program anyway?`)) return;
   }
 
+  // Cancel any pending saves from the previous meeting before loading
+  Object.keys(saveTimers).forEach(k => clearTimeout(saveTimers[k]));
+
   await loadMeetingByDate(date);
   switchTab('builder');
-  loadHistoryTab(); // refresh the programs list to highlight the new current
+  loadHistoryTab();
 }
 
 async function loadHistoryTab() {
