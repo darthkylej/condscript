@@ -1184,13 +1184,29 @@ function saveConfig() {
 }
 
 function ph(key, tokens = {}) {
-  let text = (CONFIG[key] !== undefined ? CONFIG[key] : DEFAULT_PHRASES[key]) || '';
-  // PAUSE is always available; caller tokens override if needed
+  const template = (CONFIG[key] !== undefined ? CONFIG[key] : DEFAULT_PHRASES[key]) || '';
+  // PAUSE is intentionally trusted HTML; normal user-entered token values and phrase text are escaped.
   const allTokens = { PAUSE: PAUSE_HTML, ...tokens };
-  for (const [k, v] of Object.entries(allTokens)) {
-    text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), v != null ? v : '');
+  const tokenRe = /\{([A-Za-z0-9_]+)\}/g;
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = tokenRe.exec(template)) !== null) {
+    out += escHtml(template.slice(last, m.index));
+    const k = m[1];
+    if (k === 'CALLOUT') {
+      out += '{CALLOUT}';
+    } else if (Object.prototype.hasOwnProperty.call(allTokens, k)) {
+      const v = allTokens[k];
+      const raw = v == null ? '' : String(v);
+      out += (raw === PAUSE_HTML || raw === BLANK) ? raw : escHtml(raw);
+    } else {
+      out += escHtml(m[0]);
+    }
+    last = tokenRe.lastIndex;
   }
-  return text;
+  out += escHtml(template.slice(last));
+  return out;
 }
 
 /* ── Config Tab UI ───────────────────────────────────────────── */
@@ -2110,11 +2126,14 @@ function say(text) {
 }
 
 function hymnCallout(label, num, title) {
+  const safeLabel = escHtml(label || '');
+  const safeNum   = escHtml(num || '');
+  const safeTitle = escHtml(title || '');
   return `<div class="script-hymn-callout">
     <span style="font-size:1.4rem">🎵</span>
     <div>
-      <span class="hc-label">${label}</span>
-      <span class="hc-text">${num ? '#' + num + ' — ' : ''}${title ? '"' + title + '"' : '<em>not entered</em>'}</span>
+      <span class="hc-label">${safeLabel}</span>
+      <span class="hc-text">${safeNum ? '#' + safeNum + ' — ' : ''}${safeTitle ? '&quot;' + safeTitle + '&quot;' : '<em>not entered</em>'}</span>
     </div>
   </div>`;
 }
@@ -2361,7 +2380,12 @@ async function api(method, path, body = null) {
   if (body !== null) opts.body = JSON.stringify(body);
   try {
     const res = await fetch(API_URL + path, opts);
-    return await res.json();
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; }
+    catch { data = { error: text || `HTTP ${res.status}` }; }
+    if (!res.ok) return { error: data.error || `HTTP ${res.status}`, status: res.status };
+    return data;
   } catch (e) { return { error: e.message }; }
 }
 
@@ -2591,7 +2615,10 @@ function buildVisitorComponents() {
 }
 function buildBusinessComponents(key) {
   if (key === 'stake')   return [{ component_type:'stake_business',   component_order:0, extra_data:{ active:activeBiz['stake'],   conductor: document.getElementById('stake-conductor')?.value||'' }}];
-  if (key === 'letters') return [{ component_type:'letters_business', component_order:0, notes: document.getElementById('letters-details')?.value||'', extra_data:{ active:activeBiz['letters'] }}];
+  if (key === 'letters') {
+    const details = document.getElementById('letters-details')?.value || '';
+    return [{ component_type:'letters_business', component_order:0, notes: details, extra_data:{ active:activeBiz['letters'], details } }];
+  }
   const typeMap = { releases:'release',sustainings:'sustaining',newrecords:'new_record',blessing:'baby_blessing',apnew:'ap_ordination',apadv:'ap_advancement',childbapt:'child_baptism',convertbapt:'convert_baptism' };
   const compType = typeMap[key]; if (!compType) return [];
   const tbody = document.querySelector(`#${key}-table tbody`); if (!tbody) return [];
@@ -2622,12 +2649,35 @@ function buildProgramComponents() {
 // ── Load: server data → form ───────────────────────────────────
 function setV(id, val)    { const el = document.getElementById(id); if (el && val != null) el.value = val; }
 function setBsT(id, title){ const b = document.getElementById(`bs-${id}`); if (!b||!title) return; b.dataset.val=title; b.querySelectorAll('.bs-btn').forEach(btn => btn.classList.toggle('active', btn.textContent.trim().startsWith(title==='Brother'?'Bro':'Sis'))); }
+function parseExtraData(extra) {
+  if (!extra) return {};
+  if (typeof extra === 'object') return extra;
+  if (typeof extra === 'string') {
+    try { return JSON.parse(extra); } catch { return {}; }
+  }
+  return {};
+}
+function groupComponents(components) {
+  const normalized = (components || []).map(c => ({ ...c, extra_data: parseExtraData(c.extra_data) }));
+  const byType = {};
+  const byKey = {};
+  normalized.forEach(c => {
+    if (!byType[c.component_type]) byType[c.component_type] = [];
+    byType[c.component_type].push(c);
+    if (byKey[c.component_type] === undefined) byKey[c.component_type] = c;
+  });
+  Object.values(byType).forEach(list => list.sort((a,b) => Number(a.component_order || 0) - Number(b.component_order || 0)));
+  return { normalized, byType, byKey };
+}
 
 function loadMeetingFromComponents(components, date, metadata) {
   // Suppress auto-saves and set date immediately — prevents saves firing on the wrong meeting
   _suppressSaves = true;
-  currentMeetingDate = date;
-  document.getElementById('meetingDate').value = date || '';
+  try {
+    const { normalized, byType, byKey } = groupComponents(components);
+    components = normalized;
+    currentMeetingDate = date;
+    document.getElementById('meetingDate').value = date || '';
   // Load metadata (from meetings table columns)
   if (metadata) {
     const m = metadata;
@@ -2662,7 +2712,7 @@ function loadMeetingFromComponents(components, date, metadata) {
 
   // Business — stake & letters
   if (byKey['stake_business'])   { const d=byKey['stake_business'].extra_data||{}; if (!!d.active!==!!activeBiz['stake']) toggleBusiness('stake'); if(d.conductor) document.getElementById('stake-conductor').value=d.conductor; }
-  if (byKey['letters_business']) { const d=byKey['letters_business'].extra_data||{}; if (!!d.active!==!!activeBiz['letters']) toggleBusiness('letters'); if(d.details) document.getElementById('letters-details').value=d.details; }
+  if (byKey['letters_business']) { const d=byKey['letters_business'].extra_data||{}; if (!!d.active!==!!activeBiz['letters']) toggleBusiness('letters'); document.getElementById('letters-details').value = d.details || byKey['letters_business'].notes || ''; }
 
   // Business — table items
   const bizMap=[
@@ -2694,8 +2744,10 @@ function loadMeetingFromComponents(components, date, metadata) {
   // Config
   if (byKey['config']?.extra_data) { Object.assign(CONFIG,byKey['config'].extra_data); saveConfig(); }
 
-  _suppressSaves = false;
-  updateCurrentProgramBanner();
+  } finally {
+    _suppressSaves = false;
+    updateCurrentProgramBanner();
+  }
 }
 
 // ── Load meeting from server ───────────────────────────────────
@@ -2711,6 +2763,12 @@ async function loadMeetingByDate(date) {
 }
 
 async function loadLatestMeeting() {
+  if (!AUTH.token || !AUTH.ward) return;
+  const result = await api('GET', '/meetings?limit=1');
+  if (!result.error && result.meetings?.length) {
+    await loadMeetingByDate(result.meetings[0].meeting_date);
+    return;
+  }
   const date = document.getElementById('meetingDate').value;
   if (!date) return;
   currentMeetingDate = date;
