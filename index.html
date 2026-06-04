@@ -1292,6 +1292,14 @@ function showSavedIndicator() {
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 
+function handleSaveResult(result, label) {
+  if (!result.error) {
+    showCloudSaved();
+    return;
+  }
+  console.error(`Cloud save failed (${label}):`, result.error);
+}
+
 function escHtml(s) {
   return String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -1315,6 +1323,12 @@ let visitors      = [];
 let programItems  = [];
 let announcements = [];
 let activeBiz     = {};
+let nextDomId     = Date.now();
+
+function newDomId(prefix = '') {
+  nextDomId += 1;
+  return prefix ? `${prefix}${nextDomId}` : nextDomId;
+}
 
 /* â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 window.addEventListener('DOMContentLoaded', () => {
@@ -1344,7 +1358,7 @@ function onFastSundayChange() {
 
 /* â”€â”€ Announcements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function addAnnouncement() {
-  const id  = Date.now();
+  const id  = newDomId();
   announcements.push(id);
   const container = document.getElementById('announcementList');
   const row = document.createElement('div');
@@ -1419,7 +1433,7 @@ function removeAnnouncement(id) {
 /* â”€â”€ Dynamic Rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function addPersonRow(tableId, extraCol) {
   const tbody = document.querySelector(`#${tableId}-table tbody`);
-  const id = Date.now();
+  const id = newDomId();
   const tr = document.createElement('tr'); tr.id = `row-${id}`;
   let extraTd = '';
   if (extraCol === 'calling') extraTd = `<td><input type="text" placeholder="Calling" id="col-${id}"></td>`;
@@ -1434,7 +1448,7 @@ function addPersonRow(tableId, extraCol) {
 
 function addBlessingRow() {
   const tbody = document.querySelector('#blessing-table tbody');
-  const id = Date.now();
+  const id = newDomId();
   const tr = document.createElement('tr'); tr.id = `row-${id}`;
   tr.innerHTML = `
     <td><input type="text" placeholder="Child's full name" id="child-${id}"></td>
@@ -1446,7 +1460,7 @@ function addBlessingRow() {
 
 function addApRow() {
   const tbody = document.querySelector('#apnew-table tbody');
-  const id = Date.now();
+  const id = newDomId();
   const tr = document.createElement('tr'); tr.id = `row-${id}`;
   tr.innerHTML = `
     <td><input type="text" placeholder="Full name" id="ap-name-${id}"></td>
@@ -1464,7 +1478,7 @@ function addApRow() {
 
 function addAdvRow() {
   const tbody = document.querySelector('#apadv-table tbody');
-  const id = Date.now();
+  const id = newDomId();
   const tr = document.createElement('tr'); tr.id = `row-${id}`;
   tr.innerHTML = `
     <td><input type="text" placeholder="Full name" id="adv-name-${id}"></td>
@@ -1481,7 +1495,7 @@ function addAdvRow() {
 
 function addChildBaptRow() {
   const tbody = document.querySelector('#childbapt-table tbody');
-  const id = Date.now();
+  const id = newDomId();
   const tr = document.createElement('tr'); tr.id = `row-${id}`;
   tr.innerHTML = `
     <td><input type="text" placeholder="Child's name" id="cb-name-${id}"></td>
@@ -1494,7 +1508,7 @@ function addChildBaptRow() {
 
 function addConvertBaptRow() {
   const tbody = document.querySelector('#convertbapt-table tbody');
-  const id = Date.now();
+  const id = newDomId();
   const tr = document.createElement('tr'); tr.id = `row-${id}`;
   tr.innerHTML = `
     <td><input type="text" placeholder="Full name" id="cvt-name-${id}"></td>
@@ -1523,7 +1537,7 @@ function addProgramItem(type, preload = null) {
   if (type === 'speaker' && document.getElementById('fastSunday').checked && !preload) {
     if (!confirm('Fast Sunday typically has no assigned speakers. Add one anyway?')) return;
   }
-  const id = 'pi-' + Date.now();
+  const id = newDomId('pi-');
   programItems.push({ id, type });
   document.getElementById('programEmpty')?.remove();
   const list = document.getElementById('programList');
@@ -1606,6 +1620,8 @@ function setupDrag(el) {
       const items = [...list.querySelectorAll('.program-item')];
       if (items.indexOf(dragSrc) < items.indexOf(el)) list.insertBefore(dragSrc, el.nextSibling);
       else list.insertBefore(dragSrc, el);
+      syncProgramItemsFromDom();
+      scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break'], buildProgramComponents);
     }
     el.classList.remove('drag-over');
   });
@@ -1721,7 +1737,7 @@ function addVisitor() {
   else if (info.recognize === 'homeward') recognized = goAns === 'no';
   else recognized = info.recognize === true;
 
-  const v = { id: Date.now(), callingVal, info, name, recognized, hcOnAssignment: hcAns === 'yes' };
+  const v = { id: newDomId(), callingVal, info, name, recognized, hcOnAssignment: hcAns === 'yes' };
   visitors.push(v);
   renderVisitorItem(v);
   updateVisitorBadge();
@@ -2564,7 +2580,7 @@ function schedulePatchMetadata(delay = 400) {
   saveTimers['meta'] = setTimeout(async () => {
     if (!AUTH.token || !AUTH.ward || !currentMeetingDate) return;
     const result = await api('PATCH', `/meetings/${currentMeetingDate}/metadata`, buildMetadata());
-    if (!result.error) showCloudSaved();
+    handleSaveResult(result, 'metadata');
   }, delay);
 }
 
@@ -2575,7 +2591,7 @@ function scheduleReplace(key, types, buildFn, delay = 400) {
   saveTimers[key] = setTimeout(async () => {
     if (!AUTH.token || !AUTH.ward || !currentMeetingDate) return;
     const result = await api('POST', `/meetings/${currentMeetingDate}/components/replace-type`, { component_types: types, components: buildFn() });
-    if (!result.error) showCloudSaved();
+    handleSaveResult(result, key);
   }, delay);
 }
 
@@ -2637,6 +2653,7 @@ function buildBusinessComponents(key) {
 }
 function buildProgramComponents() {
   const typeMap = { speaker:'talk', hymn:'intermediate_hymn', break:'conduction_break' };
+  syncProgramItemsFromDom();
   return programItems.map((item, i) => {
     const el = document.getElementById(item.id); if (!el) return null;
     const c = { component_type:typeMap[item.type], component_order:i };
@@ -2644,6 +2661,13 @@ function buildProgramComponents() {
     if (item.type==='hymn')    { c.hymn_number=document.getElementById(`pi-hnum-${item.id}`)?.value||''; c.hymn_title=document.getElementById(`pi-htitle-${item.id}`)?.value||''; }
     return c;
   }).filter(Boolean);
+}
+
+function syncProgramItemsFromDom() {
+  const byId = Object.fromEntries(programItems.map(item => [item.id, item]));
+  programItems = [...document.querySelectorAll('#programList .program-item')]
+    .map(el => byId[el.id])
+    .filter(Boolean);
 }
 
 // â”€â”€ Load: server data â†’ form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2723,7 +2747,7 @@ function loadMeetingFromComponents(components, date, metadata) {
   // Visitors
   visitors=[]; const vl=document.getElementById('visitorList'); vl.innerHTML='';
   const ve=document.createElement('div'); ve.id='visitorEmpty'; ve.className='empty-state'; ve.textContent='No visitors added.'; vl.appendChild(ve);
-  (byType['visitor']||[]).forEach(c => { if (c.extra_data) { const v={...c.extra_data,name:c.person_name,id:Date.now()+Math.random()}; visitors.push(v); renderVisitorItem(v); } });
+  (byType['visitor']||[]).forEach(c => { if (c.extra_data) { const v={...c.extra_data,name:c.person_name,id:newDomId()}; visitors.push(v); renderVisitorItem(v); } });
   updateVisitorBadge();
 
   // Business â€” stake & letters
