@@ -505,6 +505,16 @@ select { cursor: pointer; appearance: none;
           <label>Date</label>
           <input type="date" id="meetingDate">
         </div>
+        <div class="form-group narrow">
+          <label>Time</label>
+          <input type="time" id="meetingTime">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" id="meetingLocation" placeholder="Chapel, cultural hall, stake center, etc.">
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -886,6 +896,14 @@ select { cursor: pointer; appearance: none;
         <div class="form-group narrow">
           <label>Meeting Date</label>
           <input type="date" id="newMeetingDateInput">
+        </div>
+        <div class="form-group narrow">
+          <label>Time</label>
+          <input type="time" id="newMeetingTimeInput">
+        </div>
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" id="newMeetingLocationInput" placeholder="Location">
         </div>
         <div style="display:flex;gap:8px;padding-bottom:1px">
           <button class="btn btn-primary" onclick="confirmNewMeeting()">Open</button>
@@ -1294,13 +1312,13 @@ function showSavedIndicator() {
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 
-function handleSaveResult(result, label, date = null) {
+function handleSaveResult(result, label, meetingKey = null) {
   if (result.error) {
     console.error(`Cloud save failed (${label}):`, result.error);
     return false;
   }
   showCloudSaved();
-  if (date && result.meeting) queueRemoteMeetingApply(date, result.meeting);
+  if (meetingKey && result.meeting) queueRemoteMeetingApply(meetingKey, result.meeting);
   return true;
 }
 
@@ -2450,6 +2468,7 @@ function fillTestMode_DISABLED() {
 const API_URL   = 'https://condscript-api.kylecluff.workers.dev';
 const TOKEN_KEY = 'condscript_jwt';
 let AUTH               = { token: null, email: null, ward: null };
+let currentMeetingId   = null;   // database id of whichever program is open
 let currentMeetingDate = null;   // the date of whichever program is open
 let _suppressSaves     = false;  // true while loading — prevents saves firing during load
 const saveTimers       = {};
@@ -2655,26 +2674,54 @@ function showCloudSaved() {
   el._t = setTimeout(() => { el.style.opacity = '0'; }, 2000);
 }
 
+function meetingApiBase() {
+  if (currentMeetingId) return `/meetings/id/${currentMeetingId}`;
+  return currentMeetingDate ? `/meetings/${currentMeetingDate}` : null;
+}
+
+function currentMeetingKey() {
+  return currentMeetingId || currentMeetingDate || null;
+}
+
+function normalizeMeetingTime(value) {
+  return String(value || '').slice(0, 5);
+}
+
+function formatTime(value) {
+  const t = normalizeMeetingTime(value);
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return t;
+  const d = new Date(2000, 0, 1, h, m);
+  return d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+}
+
+function formatMeetingLabelFromParts(date, time = '', location = '') {
+  return [formatDate(date), formatTime(time), location].filter(Boolean).join(' - ');
+}
+
 // Metadata → PATCH to meetings table columns
 function schedulePatchMetadata(delay = 400) {
   if (_suppressSaves) return;
-  const date = currentMeetingDate;
-  scheduleSaveJob('meta', date, 'metadata', () =>
-    api('PATCH', `/meetings/${date}/metadata`, buildMetadata()), delay);
+  const meetingKey = currentMeetingKey();
+  const base = meetingApiBase();
+  scheduleSaveJob('meta', meetingKey, 'metadata', () =>
+    api('PATCH', `${base}/metadata`, buildMetadata()), delay);
 }
 
 // Ordered components → replace-type in meeting_components table
 function scheduleReplace(key, types, buildFn, delay = 400) {
   if (_suppressSaves) return;
-  const date = currentMeetingDate;
-  scheduleSaveJob(key, date, key, () =>
-    api('POST', `/meetings/${date}/components/replace-type`, { component_types: types, components: buildFn() }), delay);
+  const meetingKey = currentMeetingKey();
+  const base = meetingApiBase();
+  scheduleSaveJob(key, meetingKey, key, () =>
+    api('POST', `${base}/components/replace-type`, { component_types: types, components: buildFn() }), delay);
 }
 
-function scheduleSaveJob(key, date, label, run, delay) {
-  if (!date) return;
+function scheduleSaveJob(key, meetingKey, label, run, delay) {
+  if (!meetingKey) return;
   clearTimeout(saveTimers[key]);
-  saveJobs[key] = { date, label, run };
+  saveJobs[key] = { meetingKey, label, run };
   saveTimers[key] = setTimeout(() => { runSaveJob(key); }, delay);
 }
 
@@ -2686,11 +2733,11 @@ async function runSaveJob(key) {
   delete saveJobs[key];
 
   if (!AUTH.token || !AUTH.ward) return true;
-  if (currentMeetingDate !== job.date) return true;
+  if (currentMeetingKey() !== job.meetingKey) return true;
 
   const savePromise = (async () => {
     const result = await job.run();
-    return handleSaveResult(result, job.label, job.date);
+    return handleSaveResult(result, job.label, job.meetingKey);
   })();
 
   activeSavePromises.add(savePromise);
@@ -2716,9 +2763,9 @@ async function flushPendingSaves() {
   return results.every(Boolean);
 }
 
-function queueRemoteMeetingApply(date, meeting) {
-  if (date !== currentMeetingDate) return;
-  pendingRemoteMeeting = { date, meeting };
+function queueRemoteMeetingApply(meetingKey, meeting) {
+  if (meetingKey !== currentMeetingKey()) return;
+  pendingRemoteMeeting = { meetingKey, meeting };
   scheduleRemoteMeetingApply();
 }
 
@@ -2733,16 +2780,19 @@ function applyRemoteMeetingIfIdle() {
     scheduleRemoteMeetingApply();
     return;
   }
-  const { date, meeting } = pendingRemoteMeeting;
+  const { meetingKey, meeting } = pendingRemoteMeeting;
   pendingRemoteMeeting = null;
-  if (date !== currentMeetingDate) return;
-  loadMeetingFromComponents(meeting.components || [], date, meeting.metadata || {});
+  if (meetingKey !== currentMeetingKey()) return;
+  loadMeetingIntoForm(meeting);
 }
 
 // ── Build metadata object (maps to meetings table columns) ─────
 function buildMetadata() {
   return {
     ward_name:             g('wardName')         || getWardDisplayName(),
+    meeting_date:          g('meetingDate')      || currentMeetingDate,
+    meeting_time:          g('meetingTime')      || '',
+    location:              g('meetingLocation')  || '',
     presiding_name:        g('presidingName')    || '',
     conducting_name:       g('conductingName')   || '',
     chorister:             g('chorister')        || '',
@@ -2847,7 +2897,7 @@ function resetMeetingFormState(date, { clearWardName = false } = {}) {
   ['releases','sustainings','newrecords','blessing','apnew','apadv','childbapt','convertbapt'].forEach(k => { const tb=document.querySelector(`#${k}-table tbody`); if(tb) tb.innerHTML=''; if(activeBiz[k]) toggleBusiness(k); });
   if (activeBiz['stake']) toggleBusiness('stake');
   if (activeBiz['letters']) toggleBusiness('letters');
-  const metaIds = ['presidingName','conductingName','chorister','organist','invocation','benediction','openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
+  const metaIds = ['meetingTime','meetingLocation','presidingName','conductingName','chorister','organist','invocation','benediction','openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
   if (clearWardName) metaIds.unshift('wardName');
   metaIds.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('fastSunday').checked=false; onFastSundayChange();
@@ -2867,6 +2917,8 @@ function loadMeetingFromComponents(components, date, metadata) {
   if (metadata) {
     const m = metadata;
     setV('wardName',        m.ward_name);
+    setV('meetingTime',     normalizeMeetingTime(m.meeting_time));
+    setV('meetingLocation', m.location);
     setV('presidingName',   m.presiding_name);
     setV('conductingName',  m.conducting_name);
     setV('chorister',       m.chorister);
@@ -2938,22 +2990,38 @@ function loadMeetingFromComponents(components, date, metadata) {
 }
 
 // ── Load meeting from server ───────────────────────────────────
+function loadMeetingIntoForm(meeting) {
+  if (!meeting) return;
+  currentMeetingId = meeting.id || currentMeetingId;
+  const date = meeting.date || meeting.metadata?.meeting_date || currentMeetingDate;
+  currentMeetingDate = date;
+  loadMeetingFromComponents(meeting.components || [], date, meeting.metadata || {});
+}
+
 async function loadMeetingByDate(date) {
   if (!AUTH.token || !AUTH.ward) return;
   const result = await api('GET', `/meetings/${date}`);
   if (result.error) return;
   if (result.meeting) {
-    loadMeetingFromComponents(result.meeting.components || [], date, result.meeting.metadata || {});
+    loadMeetingIntoForm(result.meeting);
   } else {
+    currentMeetingId = null;
     clearFormForNewMeeting(date);
   }
+}
+
+async function loadMeetingById(id) {
+  if (!AUTH.token || !AUTH.ward || !id) return;
+  const result = await api('GET', `/meetings/id/${id}`);
+  if (result.error) { alert(result.error); return; }
+  if (result.meeting) loadMeetingIntoForm(result.meeting);
 }
 
 async function loadLatestMeeting() {
   if (!AUTH.token || !AUTH.ward) return;
   const result = await api('GET', '/meetings?limit=1');
   if (!result.error && result.meetings?.length) {
-    await loadMeetingByDate(result.meetings[0].meeting_date);
+    await loadMeetingById(result.meetings[0].id);
     return;
   }
   const date = document.getElementById('meetingDate').value;
@@ -2976,8 +3044,7 @@ function updateCurrentProgramBanner() {
   const label  = document.getElementById('currentProgramLabel');
   if (!banner || !label) return;
   if (currentMeetingDate) {
-    const d = new Date(currentMeetingDate + 'T12:00:00');
-    label.textContent = d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    label.textContent = formatMeetingLabelFromParts(currentMeetingDate, g('meetingTime'), g('meetingLocation'));
     banner.style.display = '';
   } else {
     banner.style.display = 'none';
@@ -2987,7 +3054,7 @@ function updateCurrentProgramBanner() {
 // ── Save hooks ─────────────────────────────────────────────────
 function initSaveHooks() {
   // All metadata fields (ward name, presiding, hymns, prayers, etc.) → PATCH /metadata
-  const metaIds = ['wardName','presidingName','conductingName','fastSunday','chorister','organist',
+  const metaIds = ['wardName','meetingDate','meetingTime','meetingLocation','presidingName','conductingName','fastSunday','chorister','organist',
                    'invocation','benediction',
                    'openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
   metaIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>schedulePatchMetadata())); });
@@ -3012,28 +3079,42 @@ function showNewMeetingPanel() {
   const diff = today.getDay() === 0 ? 7 : 7 - today.getDay();
   today.setDate(today.getDate() + diff);
   document.getElementById('newMeetingDateInput').value = today.toISOString().split('T')[0];
+  document.getElementById('newMeetingTimeInput').value = '';
+  document.getElementById('newMeetingLocationInput').value = '';
 }
 
 async function confirmNewMeeting() {
   const date = document.getElementById('newMeetingDateInput').value;
   if (!date) { alert('Please select a date.'); return; }
+  const time = document.getElementById('newMeetingTimeInput').value;
+  const location = document.getElementById('newMeetingLocationInput').value.trim();
 
-  // Check if meeting already exists
-  const existing = await api('GET', `/meetings/${date}`);
-  if (existing.meeting?.components?.length) {
-    if (!confirm(`A program already exists for ${date}. Open it anyway? (Your unsaved changes to the current program will be lost.)`)) return;
+  const saved = await flushPendingSaves();
+  if (!saved) {
+    alert('Some changes failed to save. Please check your connection and try again before creating a new program.');
+    return;
   }
 
+  const result = await api('POST', '/meetings', {
+    meeting_date: date,
+    meeting_time: time,
+    location,
+    ward_name: g('wardName') || getWardDisplayName(),
+  });
+  if (result.error) { alert(result.error); return; }
+
   document.getElementById('newMeetingPanel').style.display = 'none';
-  await navigateToMeeting(date);
+  await navigateToMeeting(result.meeting.id);
 }
 
-async function navigateToMeeting(date) {
+async function navigateToMeeting(id) {
+  const meetingSummary = await getMeetingSummary(id);
+  const date = meetingSummary?.meeting_date || currentMeetingDate;
   const today = new Date(); today.setHours(0,0,0,0);
   const meetDate = new Date(date + 'T12:00:00');
   const isPast = meetDate < today;
 
-  if (isPast && date !== currentMeetingDate) {
+  if (isPast && id !== currentMeetingId) {
     const fmt = meetDate.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
     if (!confirm(`${fmt} is in the past. Edit this program anyway?`)) return;
   }
@@ -3046,6 +3127,7 @@ async function navigateToMeeting(date) {
   pendingRemoteMeeting = null;
   clearTimeout(remoteApplyTimer);
 
+  currentMeetingId = id;
   currentMeetingDate = date;
   document.getElementById('meetingDate').value = date;
   updateCurrentProgramBanner();
@@ -3053,12 +3135,19 @@ async function navigateToMeeting(date) {
 
   // Load program data in the background
   try {
-    await loadMeetingByDate(date);
+    await loadMeetingById(id);
   } catch(e) {
-    console.error('loadMeetingByDate failed:', e);
+    console.error('loadMeetingById failed:', e);
   }
 
   loadHistoryTab();
+}
+
+async function getMeetingSummary(id) {
+  if (!id) return null;
+  const result = await api('GET', '/meetings?limit=200');
+  if (result.error) return null;
+  return (result.meetings || []).find(m => m.id === id) || null;
 }
 
 async function loadHistoryTab() {
@@ -3076,16 +3165,37 @@ async function loadHistoryTab() {
   document.getElementById('historyContent').innerHTML = meetings.map(m => {
     const d = new Date(m.meeting_date + 'T12:00:00');
     const fmt = d.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    const isCurrent = m.meeting_date === currentMeetingDate;
+    const time = formatTime(m.meeting_time);
+    const location = m.location || '';
+    const isCurrent = m.id === currentMeetingId;
     const isPast = d < today;
+    const meta = [time, location, m.presiding_name ? `Presiding: ${m.presiding_name}` : '', isPast ? 'Past meeting' : 'Upcoming'].filter(Boolean).join(' - ');
+    const label = formatMeetingLabelFromParts(m.meeting_date, m.meeting_time, location);
+    const encodedLabel = encodeURIComponent(label);
     return `<div class="history-item" style="${isCurrent?'border-color:var(--navy);background:#eff6ff;':''}">
       <div style="flex:1">
         <div class="history-item-date">${escHtml(fmt)}${isCurrent?' <span style="font-size:.7rem;background:var(--navy);color:white;padding:1px 7px;border-radius:8px;margin-left:6px;vertical-align:middle">OPEN</span>':''}</div>
-        <div class="history-item-meta">${isPast?'📅 Past meeting':'📋 Upcoming'}</div>
+        <div class="history-item-meta">${escHtml(meta)}</div>
       </div>
-      <button class="btn btn-sm ${isCurrent?'btn-primary':'btn-outline'}" onclick="navigateToMeeting('${m.meeting_date}')">${isCurrent?'Go to Builder →':'Open'}</button>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-sm ${isCurrent?'btn-primary':'btn-outline'}" onclick="navigateToMeeting('${m.id}')">${isCurrent?'Go to Builder ->':'Open'}</button><button class="btn btn-sm btn-danger" onclick="deleteMeeting('${m.id}', decodeURIComponent('${encodedLabel}'))">Delete</button></div>
     </div>`;
   }).join('');
+}
+
+async function deleteMeeting(id, label) {
+  if (!id) return;
+  if (!confirm(`Delete this meeting?\n\n${label}\n\nThis will permanently delete the meeting and all of its program entries.`)) return;
+  if (!confirm('Final confirmation: permanently delete this meeting?')) return;
+  const saved = await flushPendingSaves();
+  if (!saved && !confirm('Some pending edits did not save cleanly. Delete this meeting anyway?')) return;
+  const result = await api('DELETE', `/meetings/id/${id}`);
+  if (result.error) { alert(result.error); return; }
+  if (id === currentMeetingId) {
+    currentMeetingId = null;
+    currentMeetingDate = null;
+    clearFormForNewMeeting('');
+  }
+  await loadHistoryTab();
 }
 
 async function exportHistoryCsv() {
