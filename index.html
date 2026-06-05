@@ -178,6 +178,7 @@ select { cursor: pointer; appearance: none;
 .program-item-icon { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
 .program-item.speaker .program-item-icon { background: #dbeafe; }
 .program-item.hymn    .program-item-icon { background: #dcfce7; }
+.program-item.special .program-item-icon { background: #fef3c7; }
 .program-item.break {
   background: #f0f4ff; border-color: var(--navy); border-style: dashed;
   justify-content: center; gap: 8px; padding: 8px 16px;
@@ -429,7 +430,7 @@ select { cursor: pointer; appearance: none;
       <p style="font-size:.875rem;margin-bottom:16px;color:var(--gray-600)">You're not part of a ward yet. Create one to start saving programs and building history.</p>
       <div class="form-group">
         <label>Ward Name</label>
-        <input type="text" id="newWardName" placeholder="e.g. Seguin 1st Ward" onkeydown="if(event.key==='Enter')createWard()">
+        <input type="text" id="newWardName" placeholder="Ward name" onkeydown="if(event.key==='Enter')createWard()">
       </div>
     </div>
     <div class="modal-footer">
@@ -468,7 +469,7 @@ select { cursor: pointer; appearance: none;
     </svg>
     <div>
       <h1>Sacrament Meeting Conductor</h1>
-      <div class="subtitle">Seguin 1st Ward · Script Builder</div>
+      <div class="subtitle" id="headerSubtitle">Script Builder</div>
     </div>
   </div>
   <div class="header-actions">
@@ -498,7 +499,7 @@ select { cursor: pointer; appearance: none;
       <div class="form-row">
         <div class="form-group">
           <label>Ward Name</label>
-          <input type="text" id="wardName" value="Seguin 1st Ward">
+          <input type="text" id="wardName" placeholder="Ward name">
         </div>
         <div class="form-group narrow">
           <label>Date</label>
@@ -508,11 +509,11 @@ select { cursor: pointer; appearance: none;
       <div class="form-row">
         <div class="form-group">
           <label>Presiding</label>
-          <input type="text" id="presidingName" placeholder="Full name (include title if desired)">
+          <input type="text" id="presidingName" placeholder="Full name">
         </div>
         <div class="form-group">
           <label>Conducting</label>
-          <input type="text" id="conductingName" placeholder="Full name (include title if desired)">
+          <input type="text" id="conductingName" placeholder="Full name">
         </div>
       </div>
       <hr class="divider">
@@ -832,9 +833,10 @@ select { cursor: pointer; appearance: none;
       <div class="program-toolbar">
         <button class="btn btn-outline" id="addSpeakerBtn" onclick="addProgramItem('speaker')">🎤 Add Speaker</button>
         <button class="btn btn-secondary" onclick="addProgramItem('hymn')">🎵 Add Intermediate Hymn</button>
-        <button class="btn btn-secondary" onclick="addProgramItem('break')" title="Mark when you stand to conduct — affects now/then tense in the script">⏸ Conduction Break</button>
+        <button class="btn btn-secondary" onclick="addProgramItem('special')">&#9836; Add Special Musical Number</button>
+        <button class="btn btn-secondary" onclick="addProgramItem('break')" title="Mark where you stand to conduct between program segments">⏸ Conduction Break</button>
       </div>
-      <p class="text-muted" style="margin-bottom:10px">Drag ⠿ to reorder. A <strong>Conduction Break</strong> marks when you stand — hymns immediately after use "now"; others use "then".</p>
+      <p class="text-muted" style="margin-bottom:10px">Drag ⠿ to reorder. A <strong>Conduction Break</strong> marks where you stand to conduct between program segments.</p>
       <div class="program-list" id="programList">
         <div class="empty-state" id="programEmpty">No program items yet.</div>
       </div>
@@ -1027,7 +1029,7 @@ const DEFAULT_PHRASES = {
   fastPulpitOpen:
     'The time is now yours to bear your testimonies. We invite you keep your testimonies short and focused on the Savior Jesus Christ',
   intermediateHymnIntro:
-    'We will{tense} sing an intermediate hymn.{CALLOUT}',
+    'The congregation will then sing an intermediate hymn.{CALLOUT}',
 
   // ── Visitor Recognition ───────────────────────────────
   visitorPresides:
@@ -1089,7 +1091,7 @@ const DEFAULT_PHRASES = {
 
   // ── Program Items ─────────────────────────────────────
   speakerIntro:
-    'Our {ordinal} speaker is {name}.',
+    '{name} will be our {ordinal} speaker.',
 };
 
 // Descriptions for the config UI
@@ -1155,7 +1157,7 @@ const PHRASE_CONFIG = [
 
   // ── Program — Hymns ───────────────────────────────────────
   { section:'Program — Hymns', key:'intermediateHymnIntro', label:'Intermediate Hymn Introduction', rows:2,
-    tokens:'{tense} = " now" / " then" / "" based on conduction break (includes leading space), {CALLOUT}' },
+    tokens:'{CALLOUT} = where hymn box appears' },
 
   // ── Closing ───────────────────────────────────────────────
   { section:'Closing', key:'closingThanks',   label:'Closing Thanks',          rows:2, tokens:'No tokens — chorister/organist appended automatically if entered' },
@@ -1562,10 +1564,23 @@ function addProgramItem(type, preload = null) {
          <input type="text" placeholder="Hymn title" id="pi-htitle-${id}" style="flex:2">
        </div>
        <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
+    : type === 'special'
+    ? `<div class="drag-handle">${dots()}</div>
+       <div class="program-item-icon">ðŸŽ¼</div>
+       <span class="item-type-label">Special</span>
+       <div class="item-fields">
+         <input type="text" placeholder="Musical number" id="pi-special-title-${id}" style="flex:2">
+         <input type="text" placeholder="Performed by" id="pi-special-by-${id}" style="flex:2">
+       </div>
+       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">âœ•</button>`
     : /* break */
       `<div class="drag-handle">${dots()}</div>
        <span class="break-label">⏸ Conduction Break — you stand here</span>
        <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`;
+  if (type === 'special') {
+    div.querySelector('.program-item-icon').innerHTML = '&#9836;';
+    div.querySelector('button').innerHTML = '&times;';
+  }
   list.appendChild(div);
   setupDrag(div);
   // Pre-fill values if loading from saved data
@@ -1575,10 +1590,13 @@ function addProgramItem(type, preload = null) {
     } else if (type === 'hymn') {
       if (preload.num)   document.getElementById(`pi-hnum-${id}`).value  = preload.num;
       if (preload.title) document.getElementById(`pi-htitle-${id}`).value = preload.title;
+    } else if (type === 'special') {
+      if (preload.title) document.getElementById(`pi-special-title-${id}`).value = preload.title;
+      if (preload.by)    document.getElementById(`pi-special-by-${id}`).value    = preload.by;
     }
   }
   updateProgramBadge();
-  scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break'], buildProgramComponents);
+  scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
 }
 
 function dots() {
@@ -1597,7 +1615,7 @@ function removeProgramItem(id) {
     document.getElementById('programList').appendChild(e);
   }
   updateProgramBadge();
-  scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break'], buildProgramComponents);
+  scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
 }
 
 function updateProgramBadge() {
@@ -1623,7 +1641,7 @@ function setupDrag(el) {
       if (items.indexOf(dragSrc) < items.indexOf(el)) list.insertBefore(dragSrc, el.nextSibling);
       else list.insertBefore(dragSrc, el);
       syncProgramItemsFromDom();
-      scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break'], buildProgramComponents);
+      scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
     }
     el.classList.remove('drag-over');
   });
@@ -1797,7 +1815,7 @@ function updateVisitorBadge() {
    SCRIPT GENERATION
 ══════════════════════════════════════════════════════════════ */
 function generateScript() {
-  const ward       = g('wardName') || 'Seguin 1st Ward';
+  const ward       = g('wardName') || getWardDisplayName() || 'Ward';
   const dateStr    = formatDate(g('meetingDate'));
   const presiding  = g('presidingName');
   const conducting = g('conductingName');
@@ -2072,36 +2090,46 @@ function generateScript() {
     );
     const lastSpeakerEl = filledSpeakerEls[filledSpeakerEls.length - 1] || null;
 
-    // Does any break exist in the program? Determines whether to use "now"/"then" at all.
-    const hasBreaks = piDoms.some(el => el.classList.contains('break'));
-
     let speakerCount = 0;
-    let prevWasBreak = false; // true when the immediately preceding rendered item was a break
+    let followupPrefix = '';
 
     piDoms.forEach(el => {
       if (el.classList.contains('break')) {
-        prevWasBreak = true;
+        followupPrefix = '';
         html += `<div class="script-conduct-break">⏸ &nbsp; Conduction Break — you stand here</div>`;
         return;
       }
-
-      // Determine tense: ' now' if immediately after a break, ' then' if a break exists elsewhere,
-      // '' if no breaks in the program at all (includes leading space for clean token substitution)
-      const tense = prevWasBreak ? ' now' : hasBreaks ? ' then' : '';
-      prevWasBreak = false; // reset after consuming
 
       if (el.classList.contains('speaker')) {
         const name  = (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
         if (!name) return; // skip empty speakers
         const isLast = el === lastSpeakerEl;
         const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
+        const prefix = followupPrefix;
         speakerCount++;
-        html += say(ph('speakerIntro', { ordinal, name }));
+        if (speakerCount === 1 && ordinal !== 'concluding') {
+          html += say(`${escHtml(name)} will be our first speaker.`);
+        } else if (isLast) {
+          html += say(`${prefix}${escHtml(name)} will be our concluding speaker.`);
+        } else {
+          html += say(`${prefix || 'We '}will hear from ${escHtml(name)}.`);
+        }
+        followupPrefix = `After ${escHtml(possessiveName(name))} remarks, `;
       } else if (el.classList.contains('hymn')) {
         const hnum   = (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim();
         const htitle = (document.getElementById(`pi-htitle-${el.id}`)?.value || '').trim();
         if (!hnum && !htitle) return; // skip empty hymns
-        html += hymnSection('intermediateHymnIntro', 'Intermediate Hymn', hnum, htitle, { tense });
+        const lead = followupPrefix ? `${followupPrefix}the congregation` : 'The congregation';
+        html += say(`${lead} will then sing an intermediate hymn.`);
+        html += hymnCallout('Intermediate Hymn', hnum, htitle);
+        followupPrefix = 'After which, ';
+      } else if (el.classList.contains('special')) {
+        const title = (document.getElementById(`pi-special-title-${el.id}`)?.value || '').trim();
+        const by    = (document.getElementById(`pi-special-by-${el.id}`)?.value || '').trim();
+        if (!title && !by) return;
+        const lead = followupPrefix ? `${followupPrefix}we` : 'We';
+        html += say(`${lead} will then have a special musical number ${title ? escHtml(title) : BLANK} by ${by ? escHtml(by) : BLANK}.`);
+        followupPrefix = 'After which, ';
       }
     });
   }
@@ -2124,7 +2152,7 @@ function generateScript() {
   html += say(ph('benedictionIntro', { benediction: benediction || BLANK }));
 
   /* -- Render ---------------------------------------------- */
-  document.getElementById('scriptTitle').textContent  = `${ward} · ${dateStr}`;
+  document.getElementById('scriptTitle').textContent  = `${ward} - ${dateStr}`;
   document.getElementById('scriptContent').innerHTML  = html;
   document.getElementById('scriptView').classList.add('show');
   window.scrollTo(0,0);
@@ -2171,6 +2199,10 @@ function hymnSection(phraseKey, calloutLabel, num, title, extraTokens = {}) {
 
 /* ── Utilities ───────────────────────────────────────────────── */
 function g(id) { return (document.getElementById(id)?.value || '').trim(); }
+
+function possessiveName(name) {
+  return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
 
 // Given a raw date string and the meeting date, returns " this Thursday", " last Friday",
 // " on [date]", or "" — with a leading space for clean inline embedding.
@@ -2230,7 +2262,7 @@ function fillTestMode_DISABLED() {
   if (!confirm('Fill the form with sample data? This will replace all current entries.')) return;
 
   // ── Meeting Details ──────────────────────────────────────
-  document.getElementById('wardName').value        = 'Seguin 1st Ward';
+  document.getElementById('wardName').value        = getWardDisplayName() || 'Sample Ward';
   document.getElementById('meetingDate').value     = '2026-06-07';  // Sunday
   document.getElementById('presidingName').value   = 'Bishop Thomas Anderson';
   document.getElementById('conductingName').value  = 'Brother James Mitchell';
@@ -2447,6 +2479,7 @@ function showLoginScreen() {
 function showApp() {
   document.getElementById('loginOverlay').style.display = 'none';
   document.querySelector('.tab-nav').style.display      = '';
+  applyWardIdentity();
   updateAuthHeader();
   switchTab('builder');
 }
@@ -2464,6 +2497,18 @@ function updateAuthHeader() {
     ${AUTH.ward ? `<button class="btn btn-secondary btn-sm ward-pill" onclick="openWardManagement()">${escHtml(AUTH.ward.name)}</button>` : ''}
     <button class="btn btn-secondary btn-sm" onclick="handleLogout()">Sign out</button>
   `;
+}
+
+function getWardDisplayName() {
+  return AUTH.ward?.name?.trim() || '';
+}
+
+function applyWardIdentity() {
+  const ward = getWardDisplayName();
+  const wardInput = document.getElementById('wardName');
+  if (wardInput && !wardInput.value.trim()) wardInput.value = ward;
+  const subtitle = document.getElementById('headerSubtitle');
+  if (subtitle) subtitle.textContent = ward ? `${ward} - Script Builder` : 'Script Builder';
 }
 
 // ── Login flow ─────────────────────────────────────────────────
@@ -2666,7 +2711,7 @@ function applyRemoteMeetingIfIdle() {
 // ── Build metadata object (maps to meetings table columns) ─────
 function buildMetadata() {
   return {
-    ward_name:             g('wardName')         || '',
+    ward_name:             g('wardName')         || getWardDisplayName(),
     presiding_name:        g('presidingName')    || '',
     conducting_name:       g('conductingName')   || '',
     chorister:             g('chorister')        || '',
@@ -2720,13 +2765,14 @@ function buildBusinessComponents(key) {
   });
 }
 function buildProgramComponents() {
-  const typeMap = { speaker:'talk', hymn:'intermediate_hymn', break:'conduction_break' };
+  const typeMap = { speaker:'talk', hymn:'intermediate_hymn', special:'special_musical_number', break:'conduction_break' };
   syncProgramItemsFromDom();
   return programItems.map((item, i) => {
     const el = document.getElementById(item.id); if (!el) return null;
     const c = { component_type:typeMap[item.type], component_order:i };
     if (item.type==='speaker') { c.person_name=document.getElementById(`pi-name-${item.id}`)?.value||''; }
     if (item.type==='hymn')    { c.hymn_number=document.getElementById(`pi-hnum-${item.id}`)?.value||''; c.hymn_title=document.getElementById(`pi-htitle-${item.id}`)?.value||''; }
+    if (item.type==='special') { c.topic=document.getElementById(`pi-special-title-${item.id}`)?.value||''; c.person_name=document.getElementById(`pi-special-by-${item.id}`)?.value||''; }
     return c;
   }).filter(Boolean);
 }
@@ -2803,6 +2849,7 @@ function loadMeetingFromComponents(components, date, metadata) {
     setV('closingHymnNum',  m.closing_hymn_number);
     setV('closingHymnTitle',m.closing_hymn_title);
     if (m.is_fast_sunday != null) { document.getElementById('fastSunday').checked = m.is_fast_sunday; onFastSundayChange(); }
+    applyWardIdentity();
   }
 
   // Announcements
@@ -2841,12 +2888,12 @@ function loadMeetingFromComponents(components, date, metadata) {
   });
 
   // Program order
-  const progComps=components.filter(c=>['talk','intermediate_hymn','conduction_break'].includes(c.component_type)).sort((a,b)=>a.component_order-b.component_order);
+  const progComps=components.filter(c=>['talk','intermediate_hymn','special_musical_number','conduction_break'].includes(c.component_type)).sort((a,b)=>a.component_order-b.component_order);
   if (progComps.length) {
     programItems=[]; document.getElementById('programList').innerHTML='';
     const em=document.createElement('div'); em.id='programEmpty'; em.className='empty-state'; em.textContent='No program items yet.'; document.getElementById('programList').appendChild(em);
-    const tm={talk:'speaker',intermediate_hymn:'hymn',conduction_break:'break'};
-    progComps.forEach(c => addProgramItem(tm[c.component_type],{name:c.person_name,num:c.hymn_number,title:c.hymn_title}));
+    const tm={talk:'speaker',intermediate_hymn:'hymn',special_musical_number:'special',conduction_break:'break'};
+    progComps.forEach(c => addProgramItem(tm[c.component_type],{name:c.person_name,by:c.person_name,num:c.hymn_number,title:c.component_type === 'special_musical_number' ? c.topic : c.hymn_title}));
   }
 
   // Config
@@ -2887,6 +2934,7 @@ function clearFormForNewMeeting(date) {
   _suppressSaves = true;
   // Reset dynamic lists and meeting fields but keep config and the ward name default.
   resetMeetingFormState(date);
+  applyWardIdentity();
   _suppressSaves = false;
   updateCurrentProgramBanner();
 }
@@ -2920,7 +2968,7 @@ function initSaveHooks() {
     ['input','change'].forEach(ev=>el.addEventListener(ev,()=>scheduleReplace(`biz_${key}`,types,()=>buildBusinessComponents(key))));
   });
 
-  document.getElementById('programList').addEventListener('input', ()=>scheduleReplace('prog',['talk','intermediate_hymn','conduction_break'],buildProgramComponents));
+  document.getElementById('programList').addEventListener('input', ()=>scheduleReplace('prog',['talk','intermediate_hymn','conduction_break','special_musical_number'],buildProgramComponents));
 }
 
 // ── Programs tab ───────────────────────────────────────────────

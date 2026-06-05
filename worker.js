@@ -281,12 +281,7 @@ async function handleListMeetings(request, env) {
   return json({ meetings: r.rows || [] });
 }
 
-async function handleGetMeeting(request, env, date) {
-  const session = await getSession(request, env);
-  if (!session) return err('Unauthorized', 401);
-  const ward = await getUserWard(env, session.user_id);
-  if (!ward) return err('Not in a ward', 403);
-
+async function getMeetingPayload(env, wardId, date) {
   const mr = await query(env,
     `SELECT id, ward_name, presiding_name, conducting_name, chorister, organist,
             invocation, benediction, is_fast_sunday,
@@ -294,8 +289,8 @@ async function handleGetMeeting(request, env, date) {
             sacrament_hymn_number, sacrament_hymn_title,
             closing_hymn_number, closing_hymn_title
      FROM meetings WHERE ward_id = $1 AND meeting_date = $2`,
-    [ward.id, date]);
-  if (!mr.rows?.length) return json({ meeting: null });
+    [wardId, date]);
+  if (!mr.rows?.length) return null;
 
   const { id: meetingId, ...metadata } = mr.rows[0];
   const cr = await query(env,
@@ -305,7 +300,15 @@ async function handleGetMeeting(request, env, date) {
      FROM meeting_components mc LEFT JOIN users u ON u.id = mc.updated_by
      WHERE mc.meeting_id = $1 ORDER BY mc.component_order, mc.component_type`,
     [meetingId]);
-  return json({ meeting: { date, metadata, components: cr.rows || [] } });
+  return { date, metadata, components: cr.rows || [] };
+}
+
+async function handleGetMeeting(request, env, date) {
+  const session = await getSession(request, env);
+  if (!session) return err('Unauthorized', 401);
+  const ward = await getUserWard(env, session.user_id);
+  if (!ward) return err('Not in a ward', 403);
+  return json({ meeting: await getMeetingPayload(env, ward.id, date) });
 }
 
 async function handleUpsertMetadata(request, env, date) {
@@ -327,12 +330,12 @@ async function handleUpsertMetadata(request, env, date) {
   allowed.forEach(f => {
     if (meta[f] !== undefined) { sets.push(`${f} = $${i++}`); vals.push(meta[f]); }
   });
-  if (!sets.length) return json({ ok: true });
+  if (!sets.length) return json({ ok: true, meeting: await getMeetingPayload(env, ward.id, date) });
 
   const mr = await query(env, `SELECT id FROM meetings WHERE ward_id = $1 AND meeting_date = $2`, [ward.id, date]);
   vals.push(mr.rows[0].id);
   await query(env, `UPDATE meetings SET ${sets.join(', ')} WHERE id = $${i}`, vals);
-  return json({ ok: true });
+  return json({ ok: true, meeting: await getMeetingPayload(env, ward.id, date) });
 }
 
 async function handleBatchComponents(request, env, date) {
@@ -347,7 +350,7 @@ async function handleBatchComponents(request, env, date) {
     if (!comp.component_type) continue;
     await upsertComponent(env, meetingId, session.user_id, comp);
   }
-  return json({ ok: true });
+  return json({ ok: true, meeting: await getMeetingPayload(env, ward.id, date) });
 }
 
 function normalizeComponentForDb(comp, fallbackOrder = 0) {
@@ -432,7 +435,7 @@ async function handleReplaceType(request, env, date) {
   const { component_types, components } = await request.json();
   const meetingId = await ensureMeeting(env, ward.id, date, session.user_id);
   await replaceComponentsAtomic(env, meetingId, session.user_id, component_types || [], components || []);
-  return json({ ok: true });
+  return json({ ok: true, meeting: await getMeetingPayload(env, ward.id, date) });
 }
 
 async function handleExportCsv(request, env) {
