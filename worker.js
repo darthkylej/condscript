@@ -303,6 +303,52 @@ async function handleListMeetings(request, env) {
   return json({ meetings: r.rows || [] });
 }
 
+async function handleHistory(request, env) {
+  const session = await getSession(request, env);
+  if (!session) return err('Unauthorized', 401);
+  const ward = await getUserWard(env, session.user_id);
+  if (!ward) return err('Not in a ward', 403);
+
+  const url = new URL(request.url);
+  const q = (url.searchParams.get('q') || '').trim().toLowerCase();
+  const search = q ? `%${q}%` : null;
+
+  const speakerParams = search ? [ward.id, search] : [ward.id];
+  const speakerSearch = search ? `AND lower(mc.person_name) LIKE $2` : '';
+  const speakerRows = await query(env,
+    `SELECT m.id as meeting_id, m.meeting_date, m.meeting_time, m.location,
+            mc.person_name, mc.topic, mc.component_order
+     FROM meeting_components mc
+     JOIN meetings m ON m.id = mc.meeting_id
+     WHERE m.ward_id = $1
+       AND mc.component_type = 'talk'
+       AND NULLIF(trim(mc.person_name), '') IS NOT NULL
+       ${speakerSearch}
+     ORDER BY m.meeting_date DESC, m.meeting_time DESC NULLS LAST, mc.component_order ASC
+     LIMIT 500`,
+    speakerParams);
+
+  const prayerParams = search ? [ward.id, search] : [ward.id];
+  const prayerSearch = search ? `WHERE lower(name) LIKE $2` : '';
+  const prayerRows = await query(env,
+    `SELECT meeting_id, meeting_date, meeting_time, location, prayer_type, name
+     FROM (
+       SELECT id as meeting_id, meeting_date, meeting_time, location, 'Invocation' as prayer_type, invocation as name, 1 as prayer_order
+       FROM meetings
+       WHERE ward_id = $1 AND NULLIF(trim(invocation), '') IS NOT NULL
+       UNION ALL
+       SELECT id as meeting_id, meeting_date, meeting_time, location, 'Benediction' as prayer_type, benediction as name, 2 as prayer_order
+       FROM meetings
+       WHERE ward_id = $1 AND NULLIF(trim(benediction), '') IS NOT NULL
+     ) prayers
+     ${prayerSearch}
+     ORDER BY meeting_date DESC, meeting_time DESC NULLS LAST, prayer_order ASC
+     LIMIT 500`,
+    prayerParams);
+
+  return json({ speakers: speakerRows.rows || [], prayers: prayerRows.rows || [] });
+}
+
 async function getMeetingPayloadById(env, wardId, meetingId) {
   const mr = await query(env,
     `SELECT id, meeting_date, meeting_time, location,
@@ -608,6 +654,8 @@ export default {
       if (path === '/ward/members/add'    && method === 'POST') return await handleAddMember(request, env);
       if (path === '/ward/members/remove' && method === 'POST') return await handleRemoveMember(request, env);
       if (path === '/ward/leave'          && method === 'POST') return await handleLeaveWard(request, env);
+
+      if (path === '/history'              && method === 'GET')  return await handleHistory(request, env);
 
       if (path === '/meetings'             && method === 'GET')  return await handleListMeetings(request, env);
       if (path === '/meetings'             && method === 'POST') return await handleCreateMeeting(request, env);

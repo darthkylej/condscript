@@ -309,7 +309,7 @@ select { cursor: pointer; appearance: none;
 
 @media print {
   body { background: white; }
-  .app-header, .tab-nav, .script-toolbar, #app, #configTab { display: none !important; }
+  .app-header, .tab-nav, .script-toolbar, #app, #configTab, #historyTab, #peopleHistoryTab { display: none !important; }
   #scriptView { display: block !important; position: static; overflow: visible; }
   .script-page { padding: 0; max-width: 100%; }
   /* ── Black & white print optimizations ── */
@@ -444,6 +444,8 @@ select { cursor: pointer; appearance: none;
   }
   .history-item { align-items: flex-start; flex-direction: column; }
   .history-item > div:last-child { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .history-search-row { flex-direction: column; align-items: stretch; }
+  .history-table { min-width: 460px; }
 }
 
 /* ── Auth / Login ───────────────────────────────────────────── */
@@ -469,6 +471,21 @@ select { cursor: pointer; appearance: none;
 .history-item { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1.5px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; background: white; }
 .history-item-date { font-weight: 600; font-size: .875rem; }
 .history-item-meta { font-size: .75rem; color: var(--gray-400); margin-top: 2px; }
+.history-search-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 14px; }
+.history-table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.history-table { width: 100%; border-collapse: collapse; min-width: 520px; }
+.history-table th {
+  font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gray-600); text-align: left; padding: 8px; border-bottom: 1.5px solid var(--gray-200);
+  background: var(--gray-50);
+}
+.history-table td { padding: 9px 8px; border-bottom: 1px solid var(--gray-100); font-size: .85rem; vertical-align: top; }
+.history-table .date-cell { white-space: nowrap; font-weight: 600; color: var(--navy); }
+.history-table .muted-cell { color: var(--gray-600); font-size: .78rem; }
+@media (max-width: 600px) {
+  .history-search-row { flex-direction: column; align-items: stretch; }
+  .history-table { min-width: 460px; }
+}
 
 /* ── Ward management ────────────────────────────────────────── */
 .member-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
@@ -575,6 +592,7 @@ select { cursor: pointer; appearance: none;
   <button class="tab-btn active" id="tbBuilder" onclick="switchTab('builder')">📋 Builder</button>
   <button class="tab-btn" id="tbConfig"  onclick="switchTab('config')">⚙ Configuration</button>
   <button class="tab-btn" id="tbHistory" onclick="switchTab('history')">📅 Programs</button>
+  <button class="tab-btn" id="tbPeopleHistory" onclick="switchTab('peopleHistory')">🕘 History</button>
 </nav>
 
 <!-- ═══════════ BUILDER TAB ═══════════ -->
@@ -1024,6 +1042,48 @@ select { cursor: pointer; appearance: none;
 </div>
 
 <!-- ═══════════ SCRIPT VIEW ═══════════ -->
+<!-- PEOPLE HISTORY TAB -->
+<div id="peopleHistoryTab" class="main-container" style="display:none">
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">🕘</div>
+      <h2>Talk and Prayer History</h2>
+    </div>
+    <div class="card-body">
+      <div class="history-search-row">
+        <div class="form-group">
+          <label>Search Name</label>
+          <input type="text" id="peopleHistorySearch" placeholder="Type a name or part of a name" oninput="scheduleLoadPeopleHistory()">
+        </div>
+        <button class="btn btn-secondary" onclick="clearPeopleHistorySearch()">Clear</button>
+      </div>
+      <div id="peopleHistoryStatus" class="text-muted" style="margin-bottom:12px">Loading history...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">🎤</div>
+      <h2>Speakers</h2>
+      <span class="badge" id="speakerHistoryBadge" style="display:none"></span>
+    </div>
+    <div class="card-body">
+      <div id="speakerHistoryContent"><p class="empty-state">No speaker history loaded yet.</p></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="icon">🙏</div>
+      <h2>Prayers</h2>
+      <span class="badge" id="prayerHistoryBadge" style="display:none"></span>
+    </div>
+    <div class="card-body">
+      <div id="prayerHistoryContent"><p class="empty-state">No prayer history loaded yet.</p></div>
+    </div>
+  </div>
+</div>
+
 <div id="scriptView">
   <div class="script-toolbar">
     <button class="btn btn-secondary btn-sm" onclick="closeScript()">← Back</button>
@@ -1424,11 +1484,14 @@ function switchTab(tab) {
   document.getElementById('app').style.display        = tab === 'builder' ? '' : 'none';
   document.getElementById('configTab').style.display  = tab === 'config'  ? '' : 'none';
   document.getElementById('historyTab').style.display = tab === 'history' ? '' : 'none';
+  document.getElementById('peopleHistoryTab').style.display = tab === 'peopleHistory' ? '' : 'none';
   document.getElementById('tbBuilder').classList.toggle('active', tab === 'builder');
   document.getElementById('tbConfig').classList.toggle('active',  tab === 'config');
   document.getElementById('tbHistory').classList.toggle('active', tab === 'history');
+  document.getElementById('tbPeopleHistory').classList.toggle('active', tab === 'peopleHistory');
   if (tab === 'config')  renderConfigTab();
   if (tab === 'history') loadHistoryTab();
+  if (tab === 'peopleHistory') loadPeopleHistory();
 }
 
 /* ── State ─────────────────────────────────────────────────── */
@@ -2621,6 +2684,7 @@ let pendingRemoteMeeting = null;
 let remoteApplyTimer = null;
 const AUTOSAVE_DELAY_MS = 1200;
 const REMOTE_APPLY_DELAY_MS = 1500;
+let peopleHistoryTimer = null;
 
 // ── API helper ─────────────────────────────────────────────────
 async function api(method, path, body = null) {
@@ -2645,6 +2709,7 @@ async function initAuth() {
   document.getElementById('app').style.display        = 'none';
   document.getElementById('configTab').style.display  = 'none';
   document.getElementById('historyTab').style.display = 'none';
+  document.getElementById('peopleHistoryTab').style.display = 'none';
   document.querySelector('.tab-nav').style.display    = 'none';
 
   if (!AUTH.token) { showLoginScreen(); return; }
@@ -3346,6 +3411,88 @@ async function deleteMeeting(id, label) {
     clearFormForNewMeeting('');
   }
   await loadHistoryTab();
+}
+
+// ── Talk and Prayer History tab ───────────────────────────────
+function scheduleLoadPeopleHistory() {
+  clearTimeout(peopleHistoryTimer);
+  peopleHistoryTimer = setTimeout(loadPeopleHistory, 300);
+}
+
+function clearPeopleHistorySearch() {
+  const el = document.getElementById('peopleHistorySearch');
+  if (el) el.value = '';
+  loadPeopleHistory();
+}
+
+async function loadPeopleHistory() {
+  if (!AUTH.token || !AUTH.ward) {
+    document.getElementById('peopleHistoryStatus').textContent = 'Sign in and join a ward to see history.';
+    document.getElementById('speakerHistoryContent').innerHTML = '<p class="empty-state">Sign in and join a ward to see speaker history.</p>';
+    document.getElementById('prayerHistoryContent').innerHTML = '<p class="empty-state">Sign in and join a ward to see prayer history.</p>';
+    setHistoryBadge('speakerHistoryBadge', 0);
+    setHistoryBadge('prayerHistoryBadge', 0);
+    return;
+  }
+  const q = document.getElementById('peopleHistorySearch')?.value.trim() || '';
+  document.getElementById('peopleHistoryStatus').textContent = q ? `Searching for "${q}"...` : 'Loading all speaker and prayer history...';
+  const result = await api('GET', `/history${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+  if (result.error) {
+    document.getElementById('peopleHistoryStatus').textContent = result.error;
+    return;
+  }
+  renderSpeakerHistory(result.speakers || []);
+  renderPrayerHistory(result.prayers || []);
+  const summary = q ? `Showing matches for "${q}".` : 'Showing all saved speakers and prayers.';
+  document.getElementById('peopleHistoryStatus').textContent = summary;
+}
+
+function setHistoryBadge(id, count) {
+  const badge = document.getElementById(id);
+  if (!badge) return;
+  badge.textContent = count ? String(count) : '';
+  badge.style.display = count ? '' : 'none';
+}
+
+function historyMeetingDetail(row) {
+  return [formatTime(row.meeting_time), row.location || ''].filter(Boolean).join(' - ');
+}
+
+function renderSpeakerHistory(rows) {
+  setHistoryBadge('speakerHistoryBadge', rows.length);
+  const el = document.getElementById('speakerHistoryContent');
+  if (!rows.length) {
+    el.innerHTML = '<p class="empty-state">No speakers found.</p>';
+    return;
+  }
+  el.innerHTML = `<div class="history-table-wrap"><table class="history-table">
+    <thead><tr><th>Date</th><th>Speaker</th><th>Meeting</th></tr></thead>
+    <tbody>${rows.map(row => `
+      <tr>
+        <td class="date-cell">${escHtml(formatDate(row.meeting_date))}</td>
+        <td>${escHtml(row.person_name || '')}</td>
+        <td class="muted-cell">${escHtml(historyMeetingDetail(row))}</td>
+      </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function renderPrayerHistory(rows) {
+  setHistoryBadge('prayerHistoryBadge', rows.length);
+  const el = document.getElementById('prayerHistoryContent');
+  if (!rows.length) {
+    el.innerHTML = '<p class="empty-state">No prayers found.</p>';
+    return;
+  }
+  el.innerHTML = `<div class="history-table-wrap"><table class="history-table">
+    <thead><tr><th>Date</th><th>Name</th><th>Prayer</th><th>Meeting</th></tr></thead>
+    <tbody>${rows.map(row => `
+      <tr>
+        <td class="date-cell">${escHtml(formatDate(row.meeting_date))}</td>
+        <td>${escHtml(row.name || '')}</td>
+        <td>${escHtml(row.prayer_type || '')}</td>
+        <td class="muted-cell">${escHtml(historyMeetingDetail(row))}</td>
+      </tr>`).join('')}</tbody>
+  </table></div>`;
 }
 
 async function exportHistoryCsv() {
