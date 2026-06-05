@@ -1035,11 +1035,11 @@ const DEFAULT_PHRASES = {
   visitorPresides:
     '{name} is presiding.',
   visitorRecognizeHC:
-    'We recognize {name}, a member of our Stake High Council, sitting on the stand with us today.',
+    'We recognize {name} of the stake high council, sitting on the stand with us today.',
   visitorRecognizeStand:
-    'We recognize {name}, {desc}, sitting on the stand with us today.',
+    'We recognize {name} {desc}, sitting on the stand with us today.',
   visitorRecognizeMulti:
-    'We recognize the following visitors sitting on the stand with us today: {list}.',
+    'We recognize {list}, sitting on the stand with us today.',
 
   // ── Announcements ─────────────────────────────────────
   announcementIntro:
@@ -1107,7 +1107,7 @@ const PHRASE_CONFIG = [
   { section:'Visitor Recognition', key:'visitorPresides',       label:'Presiding Visitor',                    rows:1, tokens:'{name}' },
   { section:'Visitor Recognition', key:'visitorRecognizeHC',    label:'High Councilor on Assignment',         rows:2, tokens:'{name}' },
   { section:'Visitor Recognition', key:'visitorRecognizeStand', label:'Other Recognized Visitor (stand)',     rows:2, tokens:'{name}, {desc} = calling description' },
-  { section:'Visitor Recognition', key:'visitorRecognizeMulti', label:'Multiple Visitors (combined line)',    rows:2, tokens:'{list} = semicolon-separated visitor names & callings' },
+  { section:'Visitor Recognition', key:'visitorRecognizeMulti', label:'Multiple Visitors (combined line)',    rows:2, tokens:'{list} = natural-language visitor list' },
 
   // ── Announcements ─────────────────────────────────────────
   { section:'Announcements', key:'announcementIntro', label:'Announcement Count Intro', rows:1, tokens:'{count} = one/two/several, {s} = "s" or "" for plural' },
@@ -1649,22 +1649,22 @@ function setupDrag(el) {
 
 /* ── Visitor Modal ───────────────────────────────────────────── */
 const CALLING_INFO = {
-  apostle:             { recognize:true,          presides:true,  desc:'Apostle, Quorum of the Twelve' },
-  firstpresidency:     { recognize:true,          presides:true,  desc:'First Presidency' },
-  presidency70:        { recognize:true,          presides:true,  desc:'Presidency of the Seventy' },
-  firstq70:            { recognize:true,          presides:true,  desc:'First/Second Quorum of Seventy' },
-  presidingbishopric:  { recognize:true,          presides:true,  desc:'Presiding Bishopric' },
-  area70:              { recognize:true,          presides:true,  desc:'Area Seventy' },
-  missionpres:         { recognize:true,          presides:false, desc:'Mission President' },
-  stakepres:           { recognize:true,          presides:true,  desc:'Stake President' },
-  'stakepres-counselor':{ recognize:true,         presides:true,  desc:'Counselor in Stake Presidency' },
-  highcouncilor:       { recognize:'ask',         presides:false, desc:'High Councilor' },
-  templepres:          { recognize:true,          presides:false, desc:'Temple President' },
-  templematron:        { recognize:true,          presides:false, desc:'Temple Matron' },
-  genrs:               { recognize:'homeward',    presides:false, desc:'General Relief Society Presidency' },
-  genyw:               { recognize:'homeward',    presides:false, desc:'General Young Women Presidency' },
-  genprimary:          { recognize:'homeward',    presides:false, desc:'General Primary Presidency' },
-  genss:               { recognize:'homeward',    presides:false, desc:'General Sunday School Presidency' },
+  firstpresidency:     { recognize:true,          presides:true,  presideRank:100, desc:'First Presidency', recognition:'a member of the First Presidency' },
+  apostle:             { recognize:true,          presides:true,  presideRank:90,  desc:'Apostle, Quorum of the Twelve', recognition:'a member of the Quorum of the Twelve Apostles' },
+  presidency70:        { recognize:true,          presides:true,  presideRank:80,  desc:'Presidency of the Seventy', recognition:'a member of the Presidency of the Seventy' },
+  firstq70:            { recognize:true,          presides:true,  presideRank:70,  desc:'First/Second Quorum of Seventy', recognition:'a member of the Seventy' },
+  presidingbishopric:  { recognize:true,          presides:true,  presideRank:70,  desc:'Presiding Bishopric', recognition:'a member of the Presiding Bishopric' },
+  area70:              { recognize:true,          presides:true,  presideRank:60,  desc:'Area Seventy', recognition:'an Area Seventy' },
+  stakepres:           { recognize:true,          presides:true,  presideRank:50,  desc:'Stake President', recognition:'the stake president' },
+  'stakepres-counselor':{ recognize:true,         presides:true,  presideRank:40,  desc:'Counselor in Stake Presidency', recognition:'a counselor in the stake presidency' },
+  missionpres:         { recognize:true,          presides:false, presideRank:0,   desc:'Mission President', recognition:'the mission president' },
+  highcouncilor:       { recognize:'ask',         presides:false, presideRank:0,   desc:'High Councilor', recognition:'of the stake high council' },
+  templepres:          { recognize:true,          presides:false, presideRank:0,   desc:'Temple President', recognition:'the temple president' },
+  templematron:        { recognize:true,          presides:false, presideRank:0,   desc:'Temple Matron', recognition:'the temple matron' },
+  genrs:               { recognize:'homeward',    presides:false, presideRank:0,   desc:'General Relief Society Presidency', recognition:'a member of the General Relief Society Presidency' },
+  genyw:               { recognize:'homeward',    presides:false, presideRank:0,   desc:'General Young Women Presidency', recognition:'a member of the General Young Women Presidency' },
+  genprimary:          { recognize:'homeward',    presides:false, presideRank:0,   desc:'General Primary Presidency', recognition:'a member of the General Primary Presidency' },
+  genss:               { recognize:'homeward',    presides:false, presideRank:0,   desc:'General Sunday School Presidency', recognition:'a member of the General Sunday School Presidency' },
 };
 
 function openVisitorModal() {
@@ -1744,6 +1744,45 @@ function showGuidance(type, title, text) {
   box.classList.remove('hidden');
 }
 
+function visitorInfo(v) {
+  return CALLING_INFO[v.callingVal] || v.info || {};
+}
+
+function visitorPresideRank(v) {
+  const info = visitorInfo(v);
+  return info.presides ? Number(info.presideRank || 0) : 0;
+}
+
+function getPresidingVisitor(recognizedVisitors) {
+  return [...recognizedVisitors]
+    .filter(v => visitorPresideRank(v) > 0)
+    .sort((a, b) => visitorPresideRank(b) - visitorPresideRank(a))[0] || null;
+}
+
+function getCurrentPresidingVisitor() {
+  return getPresidingVisitor(visitors.filter(v => v.recognized));
+}
+
+function visitorRecognitionPart(v) {
+  const info = visitorInfo(v);
+  const name = escHtml(v.name || '[Name]');
+  const recognition = v.hcOnAssignment ? 'of the stake high council' : (info.recognition || info.desc || '');
+  if (!recognition) return name;
+  const safeRecognition = escHtml(recognition);
+  return /^of\s/i.test(recognition) ? `${name} ${safeRecognition}` : `${name}, ${safeRecognition}`;
+}
+
+function naturalJoin(parts) {
+  if (parts.length <= 1) return parts[0] || '';
+  if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+  return `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`;
+}
+
+function buildVisitorRecognitionLine(recognizedVisitors) {
+  const parts = recognizedVisitors.map(visitorRecognitionPart);
+  return parts.length ? `We recognize ${naturalJoin(parts)}, sitting on the stand with us today.` : '';
+}
+
 function addVisitor() {
   const callingVal = document.getElementById('visitorCalling').value;
   if (!callingVal) return;
@@ -1759,10 +1798,23 @@ function addVisitor() {
 
   const v = { id: newDomId(), callingVal, info, name, recognized, hcOnAssignment: hcAns === 'yes' };
   visitors.push(v);
-  renderVisitorItem(v);
+  renderVisitorList();
   updateVisitorBadge();
   closeVisitorModal();
   scheduleReplace('visitors', ['visitor'], buildVisitorComponents);
+}
+
+function renderVisitorList() {
+  const list = document.getElementById('visitorList');
+  list.innerHTML = '';
+  if (!visitors.length) {
+    const e = document.createElement('div');
+    e.id = 'visitorEmpty'; e.className = 'empty-state';
+    e.textContent = 'No visitors added.';
+    list.appendChild(e);
+    return;
+  }
+  visitors.forEach(renderVisitorItem);
 }
 
 function renderVisitorItem(v) {
@@ -1784,22 +1836,15 @@ function renderVisitorItem(v) {
   list.appendChild(div);
 }
 
-function buildVisitorLine(v) {
+function buildVisitorLine(v, presidingVisitor = getCurrentPresidingVisitor()) {
   const name = v.name || '[Name]';
-  if (v.info.presides)  return ph('visitorPresides',       { name });
-  if (v.hcOnAssignment) return ph('visitorRecognizeHC',    { name });
-  return                       ph('visitorRecognizeStand', { name, desc: v.info.desc });
+  if (v === presidingVisitor) return ph('visitorPresides', { name });
+  return buildVisitorRecognitionLine([v]);
 }
 
 function removeVisitor(id) {
   visitors = visitors.filter(v => v.id !== id);
-  document.getElementById(`vis-${id}`)?.remove();
-  if (!visitors.length) {
-    const e = document.createElement('div');
-    e.id = 'visitorEmpty'; e.className = 'empty-state';
-    e.textContent = 'No visitors added.';
-    document.getElementById('visitorList').appendChild(e);
-  }
+  renderVisitorList();
   updateVisitorBadge();
   scheduleReplace('visitors', ['visitor'], buildVisitorComponents);
 }
@@ -1817,7 +1862,10 @@ function updateVisitorBadge() {
 function generateScript() {
   const ward       = g('wardName') || getWardDisplayName() || 'Ward';
   const dateStr    = formatDate(g('meetingDate'));
-  const presiding  = g('presidingName');
+  const recogVisitors = visitors.filter(v => v.recognized);
+  const presidingVis  = getPresidingVisitor(recogVisitors);
+  const standVisitors = recogVisitors.filter(v => v !== presidingVis);
+  const presiding  = presidingVis ? (presidingVis.name || '[Name]') : g('presidingName');
   const conducting = g('conductingName');
   const chorister  = g('chorister');
   const organist   = g('organist');
@@ -1845,11 +1893,7 @@ function generateScript() {
   </div>`;
 
   /* -- WELCOME ---------------------------------------------- */
-  const recogVisitors = visitors.filter(v => v.recognized);
-  const presidingVis  = recogVisitors.find(v => v.info.presides);
   // Everyone recognized except the one who is THE presider — all sit on the stand
-  const standVisitors = recogVisitors.filter(v => v !== presidingVis);
-
   // Presiding line
   let presidingLine = '';
   if (presidingVis) {
@@ -1858,22 +1902,9 @@ function generateScript() {
     presidingLine = `${presiding || '[Presiding]'} will be Presiding.`;
   }
 
-  // Visitor stand lines (using configurable phrases)
+  // Visitor stand lines
   let visitorLines = '';
-  if (standVisitors.length === 1) {
-    const sv = standVisitors[0];
-    const svName = sv.name || '[Name]';
-    const line = sv.hcOnAssignment
-      ? ph('visitorRecognizeHC',    { name: svName })
-      : ph('visitorRecognizeStand', { name: svName, desc: sv.info.desc });
-    visitorLines = '\n\n' + line;
-  } else if (standVisitors.length > 1) {
-    const list = standVisitors.map(sv => {
-      const n = sv.name || '[Name]';
-      return sv.hcOnAssignment ? `${n} (High Councilor, on assignment)` : `${n}, ${sv.info.desc}`;
-    }).join('; ');
-    visitorLines = '\n\n' + ph('visitorRecognizeMulti', { list });
-  }
+  if (standVisitors.length) visitorLines = '\n\n' + buildVisitorRecognitionLine(standVisitors);
 
   html += secHead('Welcome');
   html += say(ph('welcome', { conducting: conducting || '[Conducting]', ward, presidingLine }) + visitorLines);
@@ -2293,8 +2324,8 @@ function fillTestMode_DISABLED() {
   ].forEach((v, i) => {
     const entry = { ...v, id: Date.now() + i, info: CALLING_INFO[v.callingVal] };
     visitors.push(entry);
-    renderVisitorItem(entry);
   });
+  renderVisitorList();
   updateVisitorBadge();
 
   // ── Announcements ─────────────────────────────────────────
@@ -2862,7 +2893,8 @@ function loadMeetingFromComponents(components, date, metadata) {
   // Visitors
   visitors=[]; const vl=document.getElementById('visitorList'); vl.innerHTML='';
   const ve=document.createElement('div'); ve.id='visitorEmpty'; ve.className='empty-state'; ve.textContent='No visitors added.'; vl.appendChild(ve);
-  (byType['visitor']||[]).forEach(c => { if (c.extra_data) { const v={...c.extra_data,name:c.person_name,id:newDomId()}; visitors.push(v); renderVisitorItem(v); } });
+  (byType['visitor']||[]).forEach(c => { if (c.extra_data) { const v={...c.extra_data,name:c.person_name,id:newDomId()}; visitors.push(v); } });
+  renderVisitorList();
   updateVisitorBadge();
 
   // Business — stake & letters
