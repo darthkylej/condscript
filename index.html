@@ -175,6 +175,7 @@ select { cursor: pointer; appearance: none;
 .program-item.drag-over { border-color: var(--navy); background: #eff6ff; transform: translateY(2px); }
 .drag-handle { cursor: grab; color: var(--gray-400); display: flex; flex-direction: column; gap: 3px; padding: 2px; flex-shrink: 0; }
 .drag-handle:active { cursor: grabbing; }
+.drag-handle { touch-action: none; }
 .drag-row { display: flex; gap: 3px; }
 .drag-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; display: block; }
 .program-item-icon { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
@@ -193,6 +194,9 @@ select { cursor: pointer; appearance: none;
 .item-fields input { flex: 1; min-width: 120px; }
 .item-fields .hymn-num { flex: 0 0 70px; min-width: 0; }
 .item-type-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-400); min-width: 60px; }
+.announcement-row .form-group { min-width: 0; }
+.announcement-delete { flex: 0 0 auto; display: flex; align-items: flex-end; padding-bottom: 1px; }
+.program-item.touch-dragging { opacity: .65; border-style: dashed; box-shadow: var(--shadow-md); }
 
 /* ── Fast Sunday Banner ─────────────────────────────────────── */
 .fast-sunday-banner { display: none; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; background: linear-gradient(135deg, #4c1d95, #7c3aed); color: white; font-size: .825rem; }
@@ -391,6 +395,27 @@ select { cursor: pointer; appearance: none;
   .form-group,
   .form-group.narrow,
   .form-group.hymnnum { flex: 1 1 auto; width: 100%; min-width: 0; }
+  .announcement-row {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .announcement-row .form-group { flex: 1 1 auto; width: auto; }
+  .announcement-row input { min-width: 0; }
+  .hymn-row {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+  }
+  .hymn-row .form-group.hymnnum {
+    flex: 0 0 64px;
+    width: 64px;
+  }
+  .hymn-row .form-group:not(.hymnnum) {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
   .program-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .program-toolbar .btn { justify-content: center; padding: 9px 8px; }
   .program-item {
@@ -542,7 +567,6 @@ select { cursor: pointer; appearance: none;
   <div class="header-actions">
     <span id="cloudSaved">✓ Saved</span>
     <div id="authInfo"></div>
-    <button class="btn btn-secondary btn-sm" onclick="clearAll()">↺ Reset</button>
   </div>
 </header>
 
@@ -647,7 +671,7 @@ select { cursor: pointer; appearance: none;
       <h2>Music</h2>
     </div>
     <div class="card-body">
-      <div class="form-row">
+      <div class="form-row hymn-row">
         <div class="form-group hymnnum">
           <label>#</label>
           <input type="text" id="openingHymnNum" placeholder="280">
@@ -657,7 +681,7 @@ select { cursor: pointer; appearance: none;
           <input type="text" id="openingHymnTitle" placeholder="Hymn title">
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row hymn-row">
         <div class="form-group hymnnum">
           <label>#</label>
           <input type="text" id="sacHymnNum" placeholder="181">
@@ -667,7 +691,7 @@ select { cursor: pointer; appearance: none;
           <input type="text" id="sacHymnTitle" placeholder="Hymn title">
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row hymn-row">
         <div class="form-group hymnnum">
           <label>#</label>
           <input type="text" id="closingHymnNum" placeholder="">
@@ -1451,12 +1475,12 @@ function addAnnouncement() {
   announcements.push(id);
   const container = document.getElementById('announcementList');
   const row = document.createElement('div');
-  row.className = 'form-row'; row.id = `ann-${id}`;
+  row.className = 'form-row announcement-row'; row.id = `ann-${id}`;
   row.innerHTML = `
     <div class="form-group">
       <input type="text" placeholder="Announcement text..." id="ann-text-${id}">
     </div>
-    <div style="flex:0 0 auto;display:flex;align-items:flex-end;padding-bottom:1px">
+    <div class="announcement-delete">
       <button class="btn btn-icon btn-danger" onclick="removeAnnouncement(${id})">✕</button>
     </div>`;
   container.appendChild(row);
@@ -1712,6 +1736,7 @@ function updateProgramBadge() {
 
 /* ── Drag & Drop ─────────────────────────────────────────────── */
 let dragSrc = null;
+let touchDrag = null;
 function setupDrag(el) {
   el.addEventListener('dragstart', () => { dragSrc = el; setTimeout(() => el.classList.add('dragging'), 0); });
   el.addEventListener('dragend',   () => { el.classList.remove('dragging'); document.querySelectorAll('.program-item').forEach(i => i.classList.remove('drag-over')); dragSrc = null; });
@@ -1730,6 +1755,38 @@ function setupDrag(el) {
     }
     el.classList.remove('drag-over');
   });
+
+  const handle = el.querySelector('.drag-handle');
+  if (!handle) return;
+  handle.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return;
+    e.preventDefault();
+    touchDrag = { el, moved:false };
+    el.classList.add('touch-dragging');
+    handle.setPointerCapture?.(e.pointerId);
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!touchDrag || touchDrag.el !== el) return;
+    e.preventDefault();
+    touchDrag.moved = true;
+    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.program-item');
+    if (!target || target === el || !document.getElementById('programList').contains(target)) return;
+    const rect = target.getBoundingClientRect();
+    if (e.clientY > rect.top + rect.height / 2) target.after(el);
+    else target.before(el);
+  });
+  const endTouchDrag = e => {
+    if (!touchDrag || touchDrag.el !== el) return;
+    handle.releasePointerCapture?.(e.pointerId);
+    el.classList.remove('touch-dragging');
+    if (touchDrag.moved) {
+      syncProgramItemsFromDom();
+      scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
+    }
+    touchDrag = null;
+  };
+  handle.addEventListener('pointerup', endTouchDrag);
+  handle.addEventListener('pointercancel', endTouchDrag);
 }
 
 /* ── Visitor Modal ───────────────────────────────────────────── */
@@ -2367,10 +2424,6 @@ function toggleMobileMode() {
 
 function closeScript() {
   document.getElementById('scriptView').classList.remove('show');
-}
-
-function clearAll() {
-  if (confirm('Reset and start a new meeting?')) location.reload();
 }
 
 /* ── [test mode removed] ─────────────────────────────────────── */
