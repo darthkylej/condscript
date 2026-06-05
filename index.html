@@ -171,13 +171,6 @@ select { cursor: pointer; appearance: none;
 .program-list { min-height: 60px; }
 .program-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; background: white; transition: all .15s; }
 .program-item:last-child { margin-bottom: 0; }
-.program-item.dragging  { opacity: .4; border-style: dashed; }
-.program-item.drag-over { border-color: var(--navy); background: #eff6ff; transform: translateY(2px); }
-.drag-handle { cursor: grab; color: var(--gray-400); display: flex; flex-direction: column; gap: 3px; padding: 2px; flex-shrink: 0; }
-.drag-handle:active { cursor: grabbing; }
-.drag-handle { touch-action: none; }
-.drag-row { display: flex; gap: 3px; }
-.drag-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; display: block; }
 .program-item-icon { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
 .program-item.speaker .program-item-icon { background: #dbeafe; }
 .program-item.hymn    .program-item-icon { background: #dcfce7; }
@@ -196,7 +189,9 @@ select { cursor: pointer; appearance: none;
 .item-type-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--gray-400); min-width: 60px; }
 .announcement-row .form-group { min-width: 0; }
 .announcement-delete { flex: 0 0 auto; display: flex; align-items: flex-end; padding-bottom: 1px; }
-.program-item.touch-dragging { opacity: .65; border-style: dashed; box-shadow: var(--shadow-md); }
+.program-reorder { display: flex; gap: 4px; align-items: center; margin-left: auto; flex-shrink: 0; }
+.program-reorder .btn-icon { min-width: 28px; height: 28px; padding: 4px; }
+.program-reorder .btn-icon:disabled { opacity: .35; cursor: default; }
 
 /* ── Fast Sunday Banner ─────────────────────────────────────── */
 .fast-sunday-banner { display: none; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; background: linear-gradient(135deg, #4c1d95, #7c3aed); color: white; font-size: .825rem; }
@@ -420,11 +415,12 @@ select { cursor: pointer; appearance: none;
   .program-toolbar .btn { justify-content: center; padding: 9px 8px; }
   .program-item {
     display: grid;
-    grid-template-columns: auto 30px 1fr auto;
+    grid-template-columns: 30px 1fr auto;
     align-items: center;
     gap: 8px;
     padding: 10px;
   }
+  .program-reorder { grid-column: 3; grid-row: 1; }
   .program-item .item-type-label { min-width: 0; font-size: .66rem; }
   .program-item .item-fields {
     grid-column: 1 / -1;
@@ -955,7 +951,7 @@ select { cursor: pointer; appearance: none;
         <button class="btn btn-secondary" onclick="addProgramItem('special')">&#9836; Add Special Musical Number</button>
         <button class="btn btn-secondary" onclick="addProgramItem('break')" title="Mark where you stand to conduct between program segments">⏸ Conduction Break</button>
       </div>
-      <p class="text-muted" style="margin-bottom:10px">Drag ⠿ to reorder. A <strong>Conduction Break</strong> marks where you stand to conduct between program segments.</p>
+      <p class="text-muted" style="margin-bottom:10px">Use the up and down arrows to reorder. A <strong>Conduction Break</strong> marks where you stand to conduct between program segments.</p>
       <div class="program-list" id="programList">
         <div class="empty-state" id="programEmpty">No program items yet.</div>
       </div>
@@ -1718,43 +1714,35 @@ function addProgramItem(type, preload = null) {
   document.getElementById('programEmpty')?.remove();
   const list = document.getElementById('programList');
   const div  = document.createElement('div');
-  div.id = id; div.className = `program-item ${type}`; div.draggable = true;
+  div.id = id;
+  div.className = `program-item ${type}`;
   div.innerHTML = type === 'speaker'
-    ? `<div class="drag-handle">${dots()}</div>
-       <div class="program-item-icon">🎤</div>
+    ? `<div class="program-item-icon">T</div>
        <span class="item-type-label">Speaker</span>
        <div class="item-fields">
          <input type="text" placeholder="Speaker name" id="pi-name-${id}">
        </div>
-       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
+       ${programControlsHtml(id)}`
     : type === 'hymn'
-    ? `<div class="drag-handle">${dots()}</div>
-       <div class="program-item-icon">🎵</div>
+    ? `<div class="program-item-icon">&#9835;</div>
        <span class="item-type-label">Hymn</span>
        <div class="item-fields">
          <input type="text" placeholder="#" class="hymn-num" id="pi-hnum-${id}">
          <input type="text" placeholder="Hymn title" id="pi-htitle-${id}" style="flex:2">
        </div>
-       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`
+       ${programControlsHtml(id)}`
     : type === 'special'
-    ? `<div class="drag-handle">${dots()}</div>
-       <div class="program-item-icon">ðŸŽ¼</div>
+    ? `<div class="program-item-icon">&#9836;</div>
        <span class="item-type-label">Special</span>
        <div class="item-fields">
          <input type="text" placeholder="Musical number" id="pi-special-title-${id}" style="flex:2">
          <input type="text" placeholder="Performed by" id="pi-special-by-${id}" style="flex:2">
        </div>
-       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">âœ•</button>`
-    : /* break */
-      `<div class="drag-handle">${dots()}</div>
-       <span class="break-label">⏸ Conduction Break — you stand here</span>
-       <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')">✕</button>`;
-  if (type === 'special') {
-    div.querySelector('.program-item-icon').innerHTML = '&#9836;';
-    div.querySelector('button').innerHTML = '&times;';
-  }
+       ${programControlsHtml(id)}`
+    : `<span class="break-label">Conduction Break - you stand here</span>
+       ${programControlsHtml(id)}`;
   list.appendChild(div);
-  setupDrag(div);
+  updateProgramMoveButtons();
   // Pre-fill values if loading from saved data
   if (preload) {
     if (type === 'speaker') {
@@ -1767,14 +1755,44 @@ function addProgramItem(type, preload = null) {
       if (preload.by)    document.getElementById(`pi-special-by-${id}`).value    = preload.by;
     }
   }
+  updateProgramMoveButtons();
   updateProgramBadge();
   scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
 }
+function programControlsHtml(id) {
+  return `<div class="program-reorder">
+    <button class="btn btn-icon btn-secondary btn-sm move-up" onclick="moveProgramItem('${id}', -1)" title="Move up">&uarr;</button>
+    <button class="btn btn-icon btn-secondary btn-sm move-down" onclick="moveProgramItem('${id}', 1)" title="Move down">&darr;</button>
+    <button class="btn btn-icon btn-danger btn-sm" onclick="removeProgramItem('${id}')" title="Delete">&times;</button>
+  </div>`;
+}
 
-function dots() {
-  return `<div class="drag-row"><span class="drag-dot"></span><span class="drag-dot"></span></div>
-          <div class="drag-row"><span class="drag-dot"></span><span class="drag-dot"></span></div>
-          <div class="drag-row"><span class="drag-dot"></span><span class="drag-dot"></span></div>`;
+function moveProgramItem(id, direction) {
+  const el = document.getElementById(id);
+  const list = document.getElementById('programList');
+  if (!el || !list) return;
+  if (direction < 0) {
+    const prev = el.previousElementSibling?.classList.contains('program-item') ? el.previousElementSibling : null;
+    if (!prev) return;
+    list.insertBefore(el, prev);
+  } else {
+    const next = el.nextElementSibling?.classList.contains('program-item') ? el.nextElementSibling : null;
+    if (!next) return;
+    list.insertBefore(next, el);
+  }
+  syncProgramItemsFromDom();
+  updateProgramMoveButtons();
+  scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
+}
+
+function updateProgramMoveButtons() {
+  const items = [...document.querySelectorAll('#programList .program-item')];
+  items.forEach((item, index) => {
+    const up = item.querySelector('.move-up');
+    const down = item.querySelector('.move-down');
+    if (up) up.disabled = index === 0;
+    if (down) down.disabled = index === items.length - 1;
+  });
 }
 
 function removeProgramItem(id) {
@@ -1786,6 +1804,7 @@ function removeProgramItem(id) {
     e.textContent = 'No program items yet.';
     document.getElementById('programList').appendChild(e);
   }
+  updateProgramMoveButtons();
   updateProgramBadge();
   scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
 }
@@ -1796,62 +1815,6 @@ function updateProgramBadge() {
   b.textContent = n > 0 ? `${n} item${n>1?'s':''}` : '';
   b.style.display = n > 0 ? '' : 'none';
 }
-
-/* ── Drag & Drop ─────────────────────────────────────────────── */
-let dragSrc = null;
-let touchDrag = null;
-function setupDrag(el) {
-  el.addEventListener('dragstart', () => { dragSrc = el; setTimeout(() => el.classList.add('dragging'), 0); });
-  el.addEventListener('dragend',   () => { el.classList.remove('dragging'); document.querySelectorAll('.program-item').forEach(i => i.classList.remove('drag-over')); dragSrc = null; });
-  el.addEventListener('dragover',  e => { e.preventDefault(); });
-  el.addEventListener('dragenter', e => { e.preventDefault(); if (el !== dragSrc) el.classList.add('drag-over'); });
-  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-  el.addEventListener('drop', e => {
-    e.preventDefault();
-    if (dragSrc && dragSrc !== el) {
-      const list  = document.getElementById('programList');
-      const items = [...list.querySelectorAll('.program-item')];
-      if (items.indexOf(dragSrc) < items.indexOf(el)) list.insertBefore(dragSrc, el.nextSibling);
-      else list.insertBefore(dragSrc, el);
-      syncProgramItemsFromDom();
-      scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
-    }
-    el.classList.remove('drag-over');
-  });
-
-  const handle = el.querySelector('.drag-handle');
-  if (!handle) return;
-  handle.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse') return;
-    e.preventDefault();
-    touchDrag = { el, moved:false };
-    el.classList.add('touch-dragging');
-    handle.setPointerCapture?.(e.pointerId);
-  });
-  handle.addEventListener('pointermove', e => {
-    if (!touchDrag || touchDrag.el !== el) return;
-    e.preventDefault();
-    touchDrag.moved = true;
-    const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.program-item');
-    if (!target || target === el || !document.getElementById('programList').contains(target)) return;
-    const rect = target.getBoundingClientRect();
-    if (e.clientY > rect.top + rect.height / 2) target.after(el);
-    else target.before(el);
-  });
-  const endTouchDrag = e => {
-    if (!touchDrag || touchDrag.el !== el) return;
-    handle.releasePointerCapture?.(e.pointerId);
-    el.classList.remove('touch-dragging');
-    if (touchDrag.moved) {
-      syncProgramItemsFromDom();
-      scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
-    }
-    touchDrag = null;
-  };
-  handle.addEventListener('pointerup', endTouchDrag);
-  handle.addEventListener('pointercancel', endTouchDrag);
-}
-
 /* ── Visitor Modal ───────────────────────────────────────────── */
 const CALLING_INFO = {
   firstpresidency:     { recognize:true,          presides:true,  presideRank:100, desc:'First Presidency', recognition:'a member of the First Presidency' },
