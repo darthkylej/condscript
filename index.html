@@ -32,7 +32,7 @@
   --serif:  'Merriweather', Georgia, serif;
 }
 html { font-size: 15px; }
-body { font-family: var(--font); background: var(--cream); color: var(--gray-800); min-height: 100vh; }
+body { font-family: var(--font); background: var(--cream); color: var(--gray-800); min-height: 100vh; overflow-x: hidden; }
 
 /* ── App Header ────────────────────────────────────────────── */
 .app-header {
@@ -43,8 +43,10 @@ body { font-family: var(--font); background: var(--cream); color: var(--gray-800
 }
 .app-header h1  { font-size: 1.05rem; font-weight: 600; letter-spacing: .01em; }
 .app-header .subtitle { font-size: .72rem; opacity: .75; margin-top: 2px; }
-.header-logo   { display: flex; align-items: center; gap: 12px; }
-.header-actions{ display: flex; gap: 8px; }
+.header-logo   { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.header-logo > div { min-width: 0; }
+.header-logo h1, .header-logo .subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-actions{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
 
 /* ── Tab Nav ───────────────────────────────────────────────── */
 .tab-nav {
@@ -79,7 +81,7 @@ body { font-family: var(--font); background: var(--cream); color: var(--gray-800
 .form-group.narrow  { flex: 0 0 150px; }
 .form-group.hymnnum { flex: 0 0 80px; }
 label { font-size: .75rem; font-weight: 600; color: var(--gray-600); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
-input[type=text], input[type=date], select, textarea {
+input[type=text], input[type=email], input[type=date], input[type=time], select, textarea {
   border: 1.5px solid var(--gray-200); border-radius: 6px;
   padding: 8px 10px; font-family: var(--font); font-size: .875rem; color: var(--gray-800);
   background: white; transition: border-color .15s, box-shadow .15s; width: 100%;
@@ -349,9 +351,74 @@ select { cursor: pointer; appearance: none;
 #scriptView.mobile-mode .script-sacrament-break { padding: 18px 14px; }
 #scriptView.mobile-mode .pause-mark { font-size: .7rem; padding: 2px 9px; }
 @media (max-width: 600px) {
+  html { font-size: 14px; }
+  .app-header {
+    padding: 10px 12px;
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+    position: static;
+  }
+  .app-header h1 { font-size: .92rem; max-width: calc(100vw - 96px); }
+  .app-header .subtitle { font-size: .68rem; }
+  .header-logo { flex: 1 1 180px; gap: 8px; }
+  .header-logo svg { width: 24px; height: 24px; flex-shrink: 0; }
+  .header-actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  #authInfo { min-width: 0; flex-wrap: wrap; }
+  #cloudSaved { margin-right: 0; }
+  .ward-pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-nav {
+    top: 0;
+    padding: 0 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab-btn {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    font-size: .82rem;
+  }
+  .main-container { padding: 12px 8px 48px; }
+  .card { border-radius: 8px; margin-bottom: 12px; }
+  .card-header { padding: 12px; gap: 8px; }
+  .card-body { padding: 12px; }
   .business-grid { grid-template-columns: 1fr; }
-  .form-row { flex-wrap: wrap; }
-  .form-group.narrow { flex: 1; min-width: 140px; }
+  .form-row { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 10px; }
+  .form-group,
+  .form-group.narrow,
+  .form-group.hymnnum { flex: 1 1 auto; width: 100%; min-width: 0; }
+  .program-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .program-toolbar .btn { justify-content: center; padding: 9px 8px; }
+  .program-item {
+    display: grid;
+    grid-template-columns: auto 30px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+  }
+  .program-item .item-type-label { min-width: 0; font-size: .66rem; }
+  .program-item .item-fields {
+    grid-column: 1 / -1;
+    width: 100%;
+    gap: 8px;
+  }
+  .program-item .item-fields input,
+  .program-item .item-fields .hymn-num {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .program-item.break { grid-template-columns: auto 1fr auto; }
+  .program-item.break .break-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    letter-spacing: .06em;
+  }
+  .history-item { align-items: flex-start; flex-direction: column; }
+  .history-item > div:last-child { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
 }
 
 /* ── Auth / Login ───────────────────────────────────────────── */
@@ -2476,6 +2543,8 @@ const saveJobs         = {};
 const activeSavePromises = new Set();
 let pendingRemoteMeeting = null;
 let remoteApplyTimer = null;
+const AUTOSAVE_DELAY_MS = 1200;
+const REMOTE_APPLY_DELAY_MS = 1500;
 
 // ── API helper ─────────────────────────────────────────────────
 async function api(method, path, body = null) {
@@ -2701,7 +2770,7 @@ function formatMeetingLabelFromParts(date, time = '', location = '') {
 }
 
 // Metadata → PATCH to meetings table columns
-function schedulePatchMetadata(delay = 400) {
+function schedulePatchMetadata(delay = AUTOSAVE_DELAY_MS) {
   if (_suppressSaves) return;
   const meetingKey = currentMeetingKey();
   const base = meetingApiBase();
@@ -2710,7 +2779,7 @@ function schedulePatchMetadata(delay = 400) {
 }
 
 // Ordered components → replace-type in meeting_components table
-function scheduleReplace(key, types, buildFn, delay = 400) {
+function scheduleReplace(key, types, buildFn, delay = AUTOSAVE_DELAY_MS) {
   if (_suppressSaves) return;
   const meetingKey = currentMeetingKey();
   const base = meetingApiBase();
@@ -2771,12 +2840,12 @@ function queueRemoteMeetingApply(meetingKey, meeting) {
 
 function scheduleRemoteMeetingApply() {
   clearTimeout(remoteApplyTimer);
-  remoteApplyTimer = setTimeout(applyRemoteMeetingIfIdle, 150);
+  remoteApplyTimer = setTimeout(applyRemoteMeetingIfIdle, REMOTE_APPLY_DELAY_MS);
 }
 
 function applyRemoteMeetingIfIdle() {
   if (!pendingRemoteMeeting) return;
-  if (hasPendingSaveWork()) {
+  if (hasPendingSaveWork() || isEditingField()) {
     scheduleRemoteMeetingApply();
     return;
   }
@@ -2784,6 +2853,11 @@ function applyRemoteMeetingIfIdle() {
   pendingRemoteMeeting = null;
   if (meetingKey !== currentMeetingKey()) return;
   loadMeetingIntoForm(meeting);
+}
+
+function isEditingField() {
+  const el = document.activeElement;
+  return !!el && ['INPUT','TEXTAREA','SELECT'].includes(el.tagName);
 }
 
 // ── Build metadata object (maps to meetings table columns) ─────
