@@ -1,0 +1,12 @@
+name = "condscript-api"
+main = "worker.js"
+compatibility_date = "2026-06-05"
+keep_vars = true
+
+[secrets]
+required = [
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "RESEND_API_KEY",
+  "RESEND_FROM",
+]
