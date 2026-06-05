@@ -1128,7 +1128,7 @@ const DEFAULT_PHRASES = {
   stakeBusiness:
     'We will now turn the time over to {by} for some Stake business.',
   closingThanks:
-    'We would like to thank everyone that participated in our Sacrament Service today.',
+    'We thank everyone who has participated in our sacrament service today. We thank our Organist {organist} and our chorister {chorister} for the music and our speakers for their preparation and messages.',
   closingHymnIntro:
     'Our Closing Hymn will be{CALLOUT}',
   benedictionIntro:
@@ -1269,7 +1269,7 @@ const PHRASE_CONFIG = [
     tokens:'{CALLOUT} = where hymn box appears' },
 
   // ── Closing ───────────────────────────────────────────────
-  { section:'Closing', key:'closingThanks',   label:'Closing Thanks',          rows:2, tokens:'No tokens — chorister/organist appended automatically if entered' },
+  { section:'Closing', key:'closingThanks',   label:'Closing Thanks',          rows:2, tokens:'{organist}, {chorister}' },
   { section:'Closing', key:'closingHymnIntro',label:'Closing Hymn Introduction',rows:2, tokens:'{CALLOUT} = where hymn box appears' },
   { section:'Closing', key:'benedictionIntro',label:'Benediction Line',         rows:2, tokens:'{benediction} — blank line printed if name not entered' },
 
@@ -1925,6 +1925,30 @@ function buildVisitorRecognitionLine(recognizedVisitors) {
   return parts.length ? `We recognize ${naturalJoin(parts)}, sitting on the stand with us today.` : '';
 }
 
+function normalizePersonNameForCompare(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\b(brother|sister|president|elder|bishop)\b/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function samePersonName(a, b) {
+  const na = normalizePersonNameForCompare(a);
+  const nb = normalizePersonNameForCompare(b);
+  return !!na && !!nb && na === nb;
+}
+
+function buildClosingThanksLine(organist, chorister) {
+  const organistName = organist ? escHtml(organist) : BLANK;
+  const choristerName = chorister ? escHtml(chorister) : BLANK;
+  const requestedLine = `We thank everyone who has participated in our sacrament service today. We thank our Organist ${organistName} and our chorister ${choristerName} for the music and our speakers for their preparation and messages.`;
+  const configuredLine = ph('closingThanks', { organist: organist || BLANK, chorister: chorister || BLANK });
+  if (/We would like to thank everyone that participated/i.test(configuredLine)) return requestedLine;
+  if (!/organist/i.test(configuredLine) || !/chorister/i.test(configuredLine)) return requestedLine;
+  return configuredLine;
+}
+
 function addVisitor() {
   const callingVal = document.getElementById('visitorCalling').value;
   if (!callingVal) return;
@@ -2020,6 +2044,10 @@ function generateScript() {
   const sacTitle   = g('sacHymnTitle');
   const closingNum = g('closingHymnNum');
   const closingTitle=g('closingHymnTitle');
+  const closingBlock = () =>
+    say(buildClosingThanksLine(organist, chorister)) +
+    hymnSection('closingHymnIntro', 'Closing Hymn', closingNum, closingTitle) +
+    say(ph('benedictionIntro', { benediction: benediction || BLANK }));
 
   let html = '';
 
@@ -2247,6 +2275,7 @@ function generateScript() {
 
   /* -- PROGRAM --------------------------------------------- */
   const piDoms = [...document.querySelectorAll('.program-item')];
+  let closingInsertedBeforeConcludingSpeaker = false;
   if (fastSunday) {
     html += secHead('Fast & Testimony Meeting');
     html += `<div class="script-fast-block">Bear a brief personal testimony, then open the pulpit to the congregation. Keep testimonies moving. Close as the hour approaches.</div>`;
@@ -2262,6 +2291,8 @@ function generateScript() {
       (document.getElementById(`pi-name-${el.id}`)?.value || '').trim()
     );
     const lastSpeakerEl = filledSpeakerEls[filledSpeakerEls.length - 1] || null;
+    const concludingSpeakerName = lastSpeakerEl ? (document.getElementById(`pi-name-${lastSpeakerEl.id}`)?.value || '').trim() : '';
+    const closingBeforeConcludingSpeaker = samePersonName(concludingSpeakerName, presiding);
 
     let speakerCount = 0;
     let followupPrefix = '';
@@ -2287,6 +2318,10 @@ function generateScript() {
         } else {
           html += say(`${prefix || 'We '}will hear from ${escHtml(name)}.`);
         }
+        if (isLast && closingBeforeConcludingSpeaker && !closingInsertedBeforeConcludingSpeaker) {
+          html += closingBlock();
+          closingInsertedBeforeConcludingSpeaker = true;
+        }
         followupPrefix = `After ${escHtml(possessiveName(name))} remarks, `;
       } else if (el.classList.contains('hymn')) {
         const hnum   = (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim();
@@ -2308,22 +2343,10 @@ function generateScript() {
   }
 
   /* -- CLOSING --------------------------------------------- */
-  html += secHead('Closing');
-
-  // Closing thanks — base phrase + chorister/organist appended
-  let thankLine = ph('closingThanks');
-  const thankParts = [];
-  if (chorister) thankParts.push(`our chorister, ${chorister}`);
-  if (organist)  thankParts.push(`our organist, ${organist}`);
-  if (thankParts.length) {
-    // strip trailing period from base phrase if present, then append
-    thankLine = thankLine.replace(/\.\s*$/, '') + ` We would also like to thank ${thankParts.join(' and ')}.`;
+  if (!closingInsertedBeforeConcludingSpeaker) {
+    html += secHead('Closing');
+    html += closingBlock();
   }
-  html += say(thankLine);
-
-  html += hymnSection('closingHymnIntro', 'Closing Hymn', closingNum, closingTitle);
-  html += say(ph('benedictionIntro', { benediction: benediction || BLANK }));
-
   /* -- Render ---------------------------------------------- */
   document.getElementById('scriptTitle').textContent  = `${ward} - ${dateStr}`;
   document.getElementById('scriptContent').innerHTML  = html;
