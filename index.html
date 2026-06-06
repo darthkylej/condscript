@@ -468,6 +468,9 @@ select { cursor: pointer; appearance: none;
 
 /* ── History tab ────────────────────────────────────────────── */
 .history-item { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1.5px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; background: white; }
+.history-item.clickable { cursor: pointer; }
+.history-item.clickable:hover { border-color: var(--navy); background: #f8fafc; }
+.history-item.clickable:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .history-item-date { font-weight: 600; font-size: .875rem; }
 .history-item-meta { font-size: .75rem; color: var(--gray-400); margin-top: 2px; }
 .history-search-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 14px; }
@@ -3434,12 +3437,12 @@ async function loadHistoryTab() {
     const meta = [time, location, m.presiding_name ? `Presiding: ${m.presiding_name}` : '', isPast ? 'Past meeting' : 'Upcoming'].filter(Boolean).join(' - ');
     const label = formatMeetingLabelFromParts(m.meeting_date, m.meeting_time, location);
     const encodedLabel = encodeURIComponent(label);
-    return `<div class="history-item" style="${isCurrent?'border-color:var(--navy);background:#eff6ff;':''}">
+    return `<div class="history-item clickable" role="button" tabindex="0" onclick="navigateToMeeting('${m.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();navigateToMeeting('${m.id}')}" style="${isCurrent?'border-color:var(--navy);background:#eff6ff;':''}">
       <div style="flex:1">
         <div class="history-item-date">${escHtml(fmt)}${isCurrent?' <span style="font-size:.7rem;background:var(--navy);color:white;padding:1px 7px;border-radius:8px;margin-left:6px;vertical-align:middle">OPEN</span>':''}</div>
         <div class="history-item-meta">${escHtml(meta)}</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-sm ${isCurrent?'btn-primary':'btn-outline'}" onclick="navigateToMeeting('${m.id}')">${isCurrent?'Go to Builder ->':'Open'}</button><button class="btn btn-sm btn-danger" onclick="deleteMeeting('${m.id}', decodeURIComponent('${encodedLabel}'))">Delete</button></div>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteMeeting('${m.id}', decodeURIComponent('${encodedLabel}'))">Delete</button></div>
     </div>`;
   }).join('');
 }
