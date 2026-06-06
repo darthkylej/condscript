@@ -115,6 +115,9 @@ select { cursor: pointer; appearance: none;
 .toggle input:checked + .toggle-slider { background: var(--navy); }
 .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
 .toggle.fast-sunday input:checked + .toggle-slider { background: #7c3aed; }
+.inline-toggle-field { min-width: 150px; }
+.inline-toggle-control { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+.inline-toggle-control span { font-size: .8125rem; color: var(--gray-700); font-weight: 500; }
 
 /* ── Buttons ────────────────────────────────────────────────── */
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-family: var(--font); font-size: .825rem; font-weight: 500; cursor: pointer; border: none; transition: all .15s; text-decoration: none; white-space: nowrap; }
@@ -614,6 +617,16 @@ select { cursor: pointer; appearance: none;
           <label>Time</label>
           <input type="time" id="meetingTime">
         </div>
+        <div class="form-group narrow inline-toggle-field">
+          <label>Online</label>
+          <div class="inline-toggle-control">
+            <label class="toggle">
+              <input type="checkbox" id="broadcastOnline" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            <span>Broadcast</span>
+          </div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -639,16 +652,6 @@ select { cursor: pointer; appearance: none;
         </div>
         <label class="toggle fast-sunday">
           <input type="checkbox" id="fastSunday" onchange="onFastSundayChange()">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="toggle-row">
-        <div>
-          <span class="toggle-label">Broadcast Online</span>
-          <span class="toggle-sublabel">Include a welcome for people watching online</span>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="broadcastOnline" checked>
           <span class="toggle-slider"></span>
         </label>
       </div>
