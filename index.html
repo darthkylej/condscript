@@ -1185,7 +1185,7 @@ select { cursor: pointer; appearance: none;
 // Text before {CALLOUT} becomes one spoken-text block; text after becomes another.
 const DEFAULT_PHRASES = {
   welcome:
-    'Good morning and welcome to The Church of Jesus Christ of Latter-day Saints, I am {conducting} and will be conducting our Sacrament meeting Services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time{onlineWelcomeLine}.',
+    'Good morning and welcome to The Church of Jesus Christ of Latter-day Saints, I am {conductingLine} our Sacrament meeting Services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time{onlineWelcomeLine}.',
   openingHymnIntro:
     'We will begin our service by the congregation singing our opening hymn.{CALLOUT}',
   invocationIntro:
@@ -1277,7 +1277,7 @@ const DEFAULT_PHRASES = {
 // Text before {CALLOUT} → one spoken block. Text after → another spoken block.
 const PHRASE_CONFIG = [
   // ── Opening ───────────────────────────────────────────────
-  { section:'Opening', key:'welcome',           label:'Welcome Greeting',                rows:5, tokens:'{conducting}, {ward}, {presidingLine}, {onlineWelcomeLine} — recognized visitor lines appended automatically' },
+  { section:'Opening', key:'welcome',           label:'Welcome Greeting',                rows:5, tokens:'{conductingLine}, {conducting}, {ward}, {presidingLine}, {onlineWelcomeLine} — recognized visitor lines appended automatically' },
   { section:'Opening', key:'openingHymnIntro',  label:'Opening Hymn Introduction',       rows:2, tokens:'{CALLOUT} = where hymn box appears' },
   { section:'Opening', key:'invocationIntro',   label:'Invocation Line',                 rows:2, tokens:'{invocation} — blank line printed if name not entered' },
 
@@ -2129,8 +2129,12 @@ function generateScript() {
   /* -- WELCOME ---------------------------------------------- */
   // Everyone recognized except the one who is THE presider — all sit on the stand
   // Presiding line
+  const samePresidingAndConducting = samePersonName(presiding, conducting);
+  const conductingLine = samePresidingAndConducting
+    ? `${conducting || '[Conducting]'} and will be presiding and conducting`
+    : `${conducting || '[Conducting]'} and will be conducting`;
   let presidingLine = '';
-  if (samePersonName(presiding, conducting)) {
+  if (samePresidingAndConducting) {
     presidingLine = '';
   } else if (presidingVis) {
     presidingLine = ph('visitorPresides', { name: presidingVis.name || '[Name]' });
@@ -2144,12 +2148,16 @@ function generateScript() {
 
   html += secHead('Welcome');
   const welcomeText = ph('welcome', {
+    conductingLine,
     conducting: conducting || '[Conducting]',
     ward,
     presidingLine,
     onlineWelcomeLine: broadcastOnline ? ' and those watching online' : '',
   });
-  html += say((broadcastOnline ? welcomeText : removeOnlineWelcomeText(welcomeText)) + visitorLines);
+  const roleAdjustedWelcomeText = samePresidingAndConducting
+    ? welcomeText.replace(/(I am\s+[^.]+?) and will be conducting/i, '$1 and will be presiding and conducting')
+    : welcomeText;
+  html += say((broadcastOnline ? roleAdjustedWelcomeText : removeOnlineWelcomeText(roleAdjustedWelcomeText)) + visitorLines);
 
   /* -- ANNOUNCEMENTS ---------------------------------------- */
   const annTexts = announcements
