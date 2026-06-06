@@ -1199,7 +1199,9 @@ const DEFAULT_PHRASES = {
   stakeBusiness:
     'We will now turn the time over to {by} for some Stake business.',
   closingThanks:
-    'We thank everyone who has participated in our sacrament service today. We thank our Organist {organist} and our chorister {chorister} for the music and our speakers for their preparation and messages.',
+    'We thank everyone who has participated in our sacrament service today. {musicThanks}We thank our speakers for their preparation and messages.',
+  closingThanksFast:
+    'Thank you brothers and sisters for your testimonies. {musicThanks}',
   closingHymnIntro:
     'Our Closing Hymn will be{CALLOUT}',
   benedictionIntro:
@@ -1339,7 +1341,8 @@ const PHRASE_CONFIG = [
     tokens:'{CALLOUT} = where hymn box appears' },
 
   // ── Closing ───────────────────────────────────────────────
-  { section:'Closing', key:'closingThanks',   label:'Closing Thanks',          rows:2, tokens:'{organist}, {chorister}' },
+  { section:'Closing', key:'closingThanks',     label:'Closing Thanks',               rows:2, tokens:'{musicThanks}' },
+  { section:'Closing', key:'closingThanksFast', label:'Closing Thanks (Fast Sunday)', rows:2, tokens:'{musicThanks}' },
   { section:'Closing', key:'closingHymnIntro',label:'Closing Hymn Introduction',rows:2, tokens:'{CALLOUT} = where hymn box appears' },
   { section:'Closing', key:'benedictionIntro',label:'Benediction Line',         rows:2, tokens:'{benediction} — blank line printed if name not entered' },
 
@@ -1988,13 +1991,21 @@ function samePersonName(a, b) {
   return !!na && !!nb && na === nb;
 }
 
-function buildClosingThanksLine(organist, chorister) {
-  const organistName = organist ? escHtml(organist) : BLANK;
-  const choristerName = chorister ? escHtml(chorister) : BLANK;
-  const requestedLine = `We thank everyone who has participated in our sacrament service today. We thank our Organist ${organistName} and our chorister ${choristerName} for the music and our speakers for their preparation and messages.`;
-  const configuredLine = ph('closingThanks', { organist: organist || BLANK, chorister: chorister || BLANK });
+function buildMusicThanksLine(organist, chorister) {
+  const names = [];
+  if (organist) names.push(`our Organist ${organist}`);
+  if (chorister) names.push(`our chorister ${chorister}`);
+  return names.length ? `We thank ${naturalJoin(names)} for the music.` : '';
+}
+
+function buildClosingThanksLine(organist, chorister, { fastSunday = false } = {}) {
+  const musicThanks = buildMusicThanksLine(organist, chorister);
+  if (fastSunday) return ph('closingThanksFast', { musicThanks });
+  const requestedLine = `We thank everyone who has participated in our sacrament service today. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}We thank our speakers for their preparation and messages.`;
+  const closingTemplate = (CONFIG.closingThanks !== undefined ? CONFIG.closingThanks : DEFAULT_PHRASES.closingThanks) || '';
+  const configuredLine = ph('closingThanks', { musicThanks });
   if (/We would like to thank everyone that participated/i.test(configuredLine)) return requestedLine;
-  if (!/organist/i.test(configuredLine) || !/chorister/i.test(configuredLine)) return requestedLine;
+  if (/\{(?:organist|chorister)\}/i.test(closingTemplate)) return requestedLine;
   return configuredLine;
 }
 
@@ -2109,7 +2120,7 @@ function generateScript() {
   const closingNum = g('closingHymnNum');
   const closingTitle=g('closingHymnTitle');
   const closingBlock = () =>
-    say(buildClosingThanksLine(organist, chorister)) +
+    say(buildClosingThanksLine(organist, chorister, { fastSunday })) +
     hymnSection('closingHymnIntro', 'Closing Hymn', closingNum, closingTitle) +
     say(ph('benedictionIntro', { benediction: benediction || BLANK }));
 
