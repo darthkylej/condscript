@@ -115,7 +115,15 @@ async function sendOtpEmail(env, email, code) {
         <p style="color:#666;font-size:.9rem">Expires in 10 minutes.</p></div>`,
     }),
   });
-  if (!res.ok) { const t = await res.text(); throw new Error(`Email error: ${t}`); }
+  if (!res.ok) {
+    const t = await res.text();
+    let message = t;
+    try { message = JSON.parse(t).message || t; } catch {}
+    if (res.status === 403 && message.includes('testing emails')) {
+      throw new Error('Email sending is still in Resend test mode. Verify a sending domain in Resend and set RESEND_FROM to an address on that domain before logging in with other email addresses.');
+    }
+    throw new Error(`Email error: ${message}`);
+  }
 }
 
 // ── Auth handlers ──────────────────────────────────────────────
@@ -126,7 +134,12 @@ async function handleSendOtp(request, env) {
   await query(env, `DELETE FROM otp_codes WHERE email = $1`, [email]);
   await query(env, `INSERT INTO otp_codes (email, code, expires_at) VALUES ($1, $2, $3)`,
     [email, code, new Date(Date.now() + 10*60*1000).toISOString()]);
-  await sendOtpEmail(env, email, code);
+  try {
+    await sendOtpEmail(env, email, code);
+  } catch (e) {
+    await query(env, `DELETE FROM otp_codes WHERE email = $1`, [email]);
+    throw e;
+  }
   return json({ ok: true });
 }
 
@@ -232,17 +245,18 @@ async function handleLeaveWard(request, env) {
 }
 
 // ── Meeting helpers ────────────────────────────────────────────
-async function createMeeting(env, wardId, userId, meta = {}) {
+async function createMeeting(env, wardId, userId, meta = {}, wardName = '') {
   if (!meta.meeting_date) throw new Error('meeting_date is required');
+  const meetingWardName = wardName || meta.ward_name || '';
   const r = await query(env,
     `INSERT INTO meetings (ward_id, meeting_date, meeting_time, location, ward_name, created_by)
      VALUES ($1, $2, NULLIF($3, '')::time, NULLIF($4, ''), NULLIF($5, ''), $6)
      RETURNING id`,
-    [wardId, meta.meeting_date, meta.meeting_time || '', meta.location || '', meta.ward_name || '', userId]);
+    [wardId, meta.meeting_date, meta.meeting_time || '', meta.location || '', meetingWardName, userId]);
   return r.rows[0].id;
 }
 
-async function ensureMeeting(env, wardId, date, userId) {
+async function ensureMeeting(env, wardId, date, userId, wardName = '') {
   const r = await query(env,
     `SELECT id FROM meetings
      WHERE ward_id = $1 AND meeting_date = $2
@@ -250,7 +264,7 @@ async function ensureMeeting(env, wardId, date, userId) {
      LIMIT 1`,
     [wardId, date]);
   if (r.rows?.length) return r.rows[0].id;
-  return await createMeeting(env, wardId, userId, { meeting_date: date });
+  return await createMeeting(env, wardId, userId, { meeting_date: date }, wardName);
 }
 
 async function getMeetingIdForWard(env, wardId, meetingId) {
@@ -399,7 +413,7 @@ async function handleCreateMeeting(request, env) {
 
   const meta = await request.json();
   if (!meta.meeting_date) return err('meeting_date is required');
-  const meetingId = await createMeeting(env, ward.id, session.user_id, meta);
+  const meetingId = await createMeeting(env, ward.id, session.user_id, meta, ward.name);
   return json({ ok: true, meeting: await getMeetingPayloadById(env, ward.id, meetingId) }, 201);
 }
 
@@ -444,7 +458,7 @@ async function handleUpsertMetadataById(request, env, meetingId) {
     if (meta[f] !== undefined) {
       const valueExpr = f === 'meeting_time' ? `NULLIF($${i}, '')::time` : `$${i}`;
       sets.push(`${f} = ${valueExpr}`);
-      vals.push(meta[f]);
+      vals.push(f === 'ward_name' ? ward.name : meta[f]);
       i++;
     }
   });
@@ -460,7 +474,7 @@ async function handleUpsertMetadata(request, env, date) {
   if (!session) return err('Unauthorized', 401);
   const ward = await getUserWard(env, session.user_id);
   if (!ward) return err('Not in a ward', 403);
-  const meetingId = await ensureMeeting(env, ward.id, date, session.user_id);
+  const meetingId = await ensureMeeting(env, ward.id, date, session.user_id, ward.name);
   return await handleUpsertMetadataById(request, env, meetingId);
 }
 
@@ -471,7 +485,7 @@ async function handleBatchComponents(request, env, date) {
   if (!ward) return err('Not in a ward', 403);
   const { components } = await request.json();
   if (!Array.isArray(components)) return err('components must be an array');
-  const meetingId = await ensureMeeting(env, ward.id, date, session.user_id);
+  const meetingId = await ensureMeeting(env, ward.id, date, session.user_id, ward.name);
   for (const comp of components) {
     if (!comp.component_type) continue;
     await upsertComponent(env, meetingId, session.user_id, comp);
@@ -575,7 +589,7 @@ async function handleReplaceType(request, env, date) {
   const ward = await getUserWard(env, session.user_id);
   if (!ward) return err('Not in a ward', 403);
   const { component_types, components } = await request.json();
-  const meetingId = await ensureMeeting(env, ward.id, date, session.user_id);
+  const meetingId = await ensureMeeting(env, ward.id, date, session.user_id, ward.name);
   await replaceComponentsAtomic(env, meetingId, session.user_id, component_types || [], components || []);
   return json({ ok: true, meeting: await getMeetingPayloadById(env, ward.id, meetingId) });
 }

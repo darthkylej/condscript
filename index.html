@@ -2702,7 +2702,7 @@ function showLoginScreen() {
 function showApp() {
   document.getElementById('loginOverlay').style.display = 'none';
   document.querySelector('.tab-nav').style.display      = '';
-  applyWardIdentity();
+  applyWardIdentity({ force: true });
   updateAuthHeader();
   switchTab('builder');
 }
@@ -2726,10 +2726,10 @@ function getWardDisplayName() {
   return AUTH.ward?.name?.trim() || '';
 }
 
-function applyWardIdentity() {
+function applyWardIdentity({ force = false } = {}) {
   const ward = getWardDisplayName();
   const wardInput = document.getElementById('wardName');
-  if (wardInput && !wardInput.value.trim()) wardInput.value = ward;
+  if (wardInput && ward && (force || !wardInput.value.trim())) wardInput.value = ward;
   const subtitle = document.getElementById('headerSubtitle');
   if (subtitle) subtitle.textContent = ward ? `${ward} - Script Builder` : 'Script Builder';
 }
@@ -2967,7 +2967,7 @@ function isEditingField() {
 // ── Build metadata object (maps to meetings table columns) ─────
 function buildMetadata() {
   return {
-    ward_name:             g('wardName')         || getWardDisplayName(),
+    ward_name:             getWardDisplayName()  || g('wardName'),
     meeting_date:          g('meetingDate')      || currentMeetingDate,
     meeting_time:          g('meetingTime')      || '',
     location:              g('meetingLocation')  || '',
@@ -3094,7 +3094,7 @@ function loadMeetingFromComponents(components, date, metadata) {
   // Load metadata (from meetings table columns)
   if (metadata) {
     const m = metadata;
-    setV('wardName',        m.ward_name);
+    setV('wardName',        getWardDisplayName() || m.ward_name);
     setV('meetingTime',     normalizeMeetingTime(m.meeting_time));
     setV('meetingLocation', m.location);
     setV('presidingName',   m.presiding_name);
@@ -3110,7 +3110,7 @@ function loadMeetingFromComponents(components, date, metadata) {
     setV('closingHymnNum',  m.closing_hymn_number);
     setV('closingHymnTitle',m.closing_hymn_title);
     if (m.is_fast_sunday != null) { document.getElementById('fastSunday').checked = m.is_fast_sunday; onFastSundayChange(); }
-    applyWardIdentity();
+    applyWardIdentity({ force: true });
   }
 
   // Announcements
@@ -3212,7 +3212,7 @@ function clearFormForNewMeeting(date) {
   _suppressSaves = true;
   // Reset dynamic lists and meeting fields but keep config and the ward name default.
   resetMeetingFormState(date);
-  applyWardIdentity();
+  applyWardIdentity({ force: true });
   _suppressSaves = false;
   updateCurrentProgramBanner();
 }
@@ -3277,7 +3277,7 @@ async function confirmNewMeeting() {
     meeting_date: date,
     meeting_time: time,
     location,
-    ward_name: g('wardName') || getWardDisplayName(),
+    ward_name: getWardDisplayName() || g('wardName'),
   });
   if (result.error) { alert(result.error); return; }
 
