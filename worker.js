@@ -249,10 +249,10 @@ async function createMeeting(env, wardId, userId, meta = {}, wardName = '') {
   if (!meta.meeting_date) throw new Error('meeting_date is required');
   const meetingWardName = wardName || meta.ward_name || '';
   const r = await query(env,
-    `INSERT INTO meetings (ward_id, meeting_date, meeting_time, location, ward_name, created_by)
-     VALUES ($1, $2, NULLIF($3, '')::time, NULLIF($4, ''), NULLIF($5, ''), $6)
+    `INSERT INTO meetings (ward_id, meeting_date, meeting_time, location, ward_name, is_broadcast, created_by)
+     VALUES ($1, $2, NULLIF($3, '')::time, NULLIF($4, ''), NULLIF($5, ''), $6, $7)
      RETURNING id`,
-    [wardId, meta.meeting_date, meta.meeting_time || '', meta.location || '', meetingWardName, userId]);
+    [wardId, meta.meeting_date, meta.meeting_time || '', meta.location || '', meetingWardName, meta.is_broadcast !== false, userId]);
   return r.rows[0].id;
 }
 
@@ -367,7 +367,7 @@ async function getMeetingPayloadById(env, wardId, meetingId) {
   const mr = await query(env,
     `SELECT id, meeting_date, meeting_time, location,
             ward_name, presiding_name, conducting_name, chorister, organist,
-            invocation, benediction, is_fast_sunday,
+            invocation, benediction, is_fast_sunday, is_broadcast,
             opening_hymn_number, opening_hymn_title,
             sacrament_hymn_number, sacrament_hymn_title,
             closing_hymn_number, closing_hymn_title
@@ -448,7 +448,7 @@ async function handleUpsertMetadataById(request, env, meetingId) {
   const meta = await request.json();
 
   const allowed = ['ward_name','presiding_name','conducting_name','chorister','organist',
-    'invocation','benediction','is_fast_sunday','meeting_date','meeting_time','location',
+    'invocation','benediction','is_fast_sunday','is_broadcast','meeting_date','meeting_time','location',
     'opening_hymn_number','opening_hymn_title',
     'sacrament_hymn_number','sacrament_hymn_title',
     'closing_hymn_number','closing_hymn_title'];
@@ -614,7 +614,7 @@ async function handleExportCsv(request, env) {
   const r = await query(env,
     `SELECT m.meeting_date, m.meeting_time, m.location,
             m.ward_name, m.presiding_name, m.conducting_name,
-            m.chorister, m.organist, m.invocation, m.benediction, m.is_fast_sunday,
+            m.chorister, m.organist, m.invocation, m.benediction, m.is_fast_sunday, m.is_broadcast,
             m.opening_hymn_number, m.opening_hymn_title,
             m.sacrament_hymn_number, m.sacrament_hymn_title,
             m.closing_hymn_number, m.closing_hymn_title,
@@ -630,7 +630,7 @@ async function handleExportCsv(request, env) {
     [ward.id]);
   const rows = r.rows || [];
   const headers = ['meeting_date','meeting_time','location','ward_name','presiding_name','conducting_name','chorister','organist',
-    'invocation','benediction','is_fast_sunday',
+    'invocation','benediction','is_fast_sunday','is_broadcast',
     'opening_hymn_number','opening_hymn_title','sacrament_hymn_number','sacrament_hymn_title','closing_hymn_number','closing_hymn_title',
     'component_type','component_order','person_name','person_title','topic','hymn_number','hymn_title','notes','updated_by','updated_at'];
   function csvCell(value) {

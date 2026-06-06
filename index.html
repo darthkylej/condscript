@@ -642,6 +642,16 @@ select { cursor: pointer; appearance: none;
           <span class="toggle-slider"></span>
         </label>
       </div>
+      <div class="toggle-row">
+        <div>
+          <span class="toggle-label">Broadcast Online</span>
+          <span class="toggle-sublabel">Include a welcome for people watching online</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="broadcastOnline" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -1172,7 +1182,7 @@ select { cursor: pointer; appearance: none;
 // Text before {CALLOUT} becomes one spoken-text block; text after becomes another.
 const DEFAULT_PHRASES = {
   welcome:
-    'Good morning and welcome to The Church of Jesus Christ of Latter-day Saints, I am {conducting} and will be conducting our Sacrament meeting Services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time and those watching online.',
+    'Good morning and welcome to The Church of Jesus Christ of Latter-day Saints, I am {conducting} and will be conducting our Sacrament meeting Services today for the {ward}. {presidingLine}\n\nWe especially want to welcome those who may be visiting or attending for the first time{onlineWelcomeLine}.',
   openingHymnIntro:
     'We will begin our service by the congregation singing our opening hymn.{CALLOUT}',
   invocationIntro:
@@ -1264,7 +1274,7 @@ const DEFAULT_PHRASES = {
 // Text before {CALLOUT} → one spoken block. Text after → another spoken block.
 const PHRASE_CONFIG = [
   // ── Opening ───────────────────────────────────────────────
-  { section:'Opening', key:'welcome',           label:'Welcome Greeting',                rows:5, tokens:'{conducting}, {ward}, {presidingLine} — recognized visitor lines appended automatically' },
+  { section:'Opening', key:'welcome',           label:'Welcome Greeting',                rows:5, tokens:'{conducting}, {ward}, {presidingLine}, {onlineWelcomeLine} — recognized visitor lines appended automatically' },
   { section:'Opening', key:'openingHymnIntro',  label:'Opening Hymn Introduction',       rows:2, tokens:'{CALLOUT} = where hymn box appears' },
   { section:'Opening', key:'invocationIntro',   label:'Invocation Line',                 rows:2, tokens:'{invocation} — blank line printed if name not entered' },
 
@@ -1374,6 +1384,16 @@ function ph(key, tokens = {}) {
   }
   out += escHtml(template.slice(last));
   return out;
+}
+
+function removeOnlineWelcomeText(html) {
+  return html
+    .replace(/ and those watching online/gi, '')
+    .replace(/,?\s*those watching online/gi, '')
+    .replace(/ and those joining us online/gi, '')
+    .replace(/,?\s*those joining us online/gi, '')
+    .replace(/ and those viewing online/gi, '')
+    .replace(/,?\s*those viewing online/gi, '');
 }
 
 /* ── Config Tab UI ───────────────────────────────────────────── */
@@ -2062,6 +2082,7 @@ function generateScript() {
   const chorister  = g('chorister');
   const organist   = g('organist');
   const fastSunday = document.getElementById('fastSunday').checked;
+  const broadcastOnline = document.getElementById('broadcastOnline')?.checked !== false;
   const invocation = g('invocation');
   const benediction= g('benediction');
   const openNum    = g('openingHymnNum');
@@ -2103,7 +2124,13 @@ function generateScript() {
   if (standVisitors.length) visitorLines = '\n\n' + buildVisitorRecognitionLine(standVisitors);
 
   html += secHead('Welcome');
-  html += say(ph('welcome', { conducting: conducting || '[Conducting]', ward, presidingLine }) + visitorLines);
+  const welcomeText = ph('welcome', {
+    conducting: conducting || '[Conducting]',
+    ward,
+    presidingLine,
+    onlineWelcomeLine: broadcastOnline ? ' and those watching online' : '',
+  });
+  html += say((broadcastOnline ? welcomeText : removeOnlineWelcomeText(welcomeText)) + visitorLines);
 
   /* -- ANNOUNCEMENTS ---------------------------------------- */
   const annTexts = announcements
@@ -2978,6 +3005,7 @@ function buildMetadata() {
     invocation:            g('invocation')       || '',
     benediction:           g('benediction')      || '',
     is_fast_sunday:        document.getElementById('fastSunday').checked,
+    is_broadcast:          document.getElementById('broadcastOnline')?.checked !== false,
     opening_hymn_number:   g('openingHymnNum')   || '',
     opening_hymn_title:    g('openingHymnTitle') || '',
     sacrament_hymn_number: g('sacHymnNum')       || '',
@@ -3079,6 +3107,7 @@ function resetMeetingFormState(date, { clearWardName = false } = {}) {
   if (clearWardName) metaIds.unshift('wardName');
   metaIds.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('fastSunday').checked=false; onFastSundayChange();
+  document.getElementById('broadcastOnline').checked=true;
   document.getElementById('stake-conductor').value='';
   document.getElementById('letters-details').value='';
   document.getElementById('meetingDate').value = date || '';
@@ -3110,6 +3139,7 @@ function loadMeetingFromComponents(components, date, metadata) {
     setV('closingHymnNum',  m.closing_hymn_number);
     setV('closingHymnTitle',m.closing_hymn_title);
     if (m.is_fast_sunday != null) { document.getElementById('fastSunday').checked = m.is_fast_sunday; onFastSundayChange(); }
+    document.getElementById('broadcastOnline').checked = m.is_broadcast !== false;
     applyWardIdentity({ force: true });
   }
 
@@ -3232,7 +3262,7 @@ function updateCurrentProgramBanner() {
 // ── Save hooks ─────────────────────────────────────────────────
 function initSaveHooks() {
   // All metadata fields (ward name, presiding, hymns, prayers, etc.) → PATCH /metadata
-  const metaIds = ['wardName','meetingDate','meetingTime','meetingLocation','presidingName','conductingName','fastSunday','chorister','organist',
+  const metaIds = ['wardName','meetingDate','meetingTime','meetingLocation','presidingName','conductingName','fastSunday','broadcastOnline','chorister','organist',
                    'invocation','benediction',
                    'openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
   metaIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>schedulePatchMetadata())); });
