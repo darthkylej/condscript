@@ -1194,6 +1194,8 @@ const DEFAULT_PHRASES = {
     'We will now prepare for the Sacred Ordinance of Sacrament by singing the sacrament hymn{CALLOUT}After the sacrament hymn, our priesthood holders will reverently bless and pass the sacrament to all of us in the congregation, while they are preparing and passing the sacrament we invite you to ponder the sacrifice and atonement of our Savior Jesus Christ.',
   afterSacrament:
     'We thank you for your reverence during the Ordinance of the Sacrament and our service will now continue as follows.',
+  afterSacramentFast:
+    'Thank you for your reverence during the ordinance of the Sacrament.',
   stakeBusiness:
     'We will now turn the time over to {by} for some Stake business.',
   closingThanks:
@@ -1326,7 +1328,8 @@ const PHRASE_CONFIG = [
 
   // ── Sacrament ─────────────────────────────────────────────
   { section:'Sacrament', key:'sacHymnIntro',   label:'Sacrament Hymn Introduction', rows:4, tokens:'{CALLOUT} = where hymn box appears' },
-  { section:'Sacrament', key:'afterSacrament', label:'After Sacrament',              rows:2, tokens:'No tokens' },
+  { section:'Sacrament', key:'afterSacrament',     label:'After Sacrament',              rows:2, tokens:'No tokens' },
+  { section:'Sacrament', key:'afterSacramentFast', label:'After Sacrament (Fast Sunday)', rows:2, tokens:'No tokens' },
 
   // ── Program — Speakers ────────────────────────────────────
   { section:'Program — Speakers', key:'speakerIntro', label:'Speaker Introduction', rows:2, tokens:'{ordinal} = first/second/concluding, {name}' },
@@ -2348,7 +2351,7 @@ function generateScript() {
   </div>`;
 
   /* -- AFTER SACRAMENT -------------------------------------- */
-  if (!fastSunday) html += say(ph('afterSacrament'));
+  html += say(ph(fastSunday ? 'afterSacramentFast' : 'afterSacrament'));
 
   /* -- PROGRAM --------------------------------------------- */
   const piDoms = [...document.querySelectorAll('.program-item')];
