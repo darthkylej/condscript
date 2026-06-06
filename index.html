@@ -589,7 +589,6 @@ select { cursor: pointer; appearance: none;
 <!-- ═══════════ TAB NAV ═══════════ -->
 <nav class="tab-nav">
   <button class="tab-btn active" id="tbBuilder" onclick="switchTab('builder')">📋 Builder</button>
-  <button class="tab-btn" id="tbConfig"  onclick="switchTab('config')">⚙ Configuration</button>
   <button class="tab-btn" id="tbHistory" onclick="switchTab('history')">📅 Programs</button>
   <button class="tab-btn" id="tbPeopleHistory" onclick="switchTab('peopleHistory')">🕘 History</button>
   <button class="tab-btn" id="tbScript" onclick="generateScript()">📄 Script</button>
@@ -1514,7 +1513,7 @@ function switchTab(tab) {
   document.getElementById('historyTab').style.display = tab === 'history' ? '' : 'none';
   document.getElementById('peopleHistoryTab').style.display = tab === 'peopleHistory' ? '' : 'none';
   document.getElementById('tbBuilder').classList.toggle('active', tab === 'builder');
-  document.getElementById('tbConfig').classList.toggle('active',  tab === 'config');
+  document.getElementById('tbConfig')?.classList.toggle('active',  tab === 'config');
   document.getElementById('tbHistory').classList.toggle('active', tab === 'history');
   document.getElementById('tbPeopleHistory').classList.toggle('active', tab === 'peopleHistory');
   document.getElementById('tbScript').classList.remove('active');
