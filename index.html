@@ -2074,6 +2074,20 @@ function updateVisitorBadge() {
 /* ══════════════════════════════════════════════════════════════
    SCRIPT GENERATION
 ══════════════════════════════════════════════════════════════ */
+function normalizePersonNameForCompare(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\b(bishop|president|elder|brother|sister|br|sis)\b\.?/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function samePersonName(a, b) {
+  const aa = normalizePersonNameForCompare(a);
+  const bb = normalizePersonNameForCompare(b);
+  return !!aa && !!bb && aa === bb;
+}
+
 function generateScript() {
   const ward       = g('wardName') || getWardDisplayName() || 'Ward';
   const dateStr    = formatDate(g('meetingDate'));
@@ -2116,7 +2130,9 @@ function generateScript() {
   // Everyone recognized except the one who is THE presider — all sit on the stand
   // Presiding line
   let presidingLine = '';
-  if (presidingVis) {
+  if (samePersonName(presiding, conducting)) {
+    presidingLine = '';
+  } else if (presidingVis) {
     presidingLine = ph('visitorPresides', { name: presidingVis.name || '[Name]' });
   } else {
     presidingLine = `${presiding || '[Presiding]'} will be Presiding.`;
