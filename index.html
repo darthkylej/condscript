@@ -1202,8 +1202,6 @@ const DEFAULT_PHRASES = {
     'Our Closing Hymn will be{CALLOUT}',
   benedictionIntro:
     'Following the Closing Hymn, {benediction} will offer the benediction.',
-  fastTestimonyOpen:
-    'Brothers and sisters, today is fast and testimony meeting. I am grateful for this opportunity to bear my testimony...',
   fastPulpitOpen:
     'The time is now yours to bear your testimonies. We invite you keep your testimonies short and focused on the Savior Jesus Christ',
   intermediateHymnIntro:
@@ -1343,7 +1341,6 @@ const PHRASE_CONFIG = [
   { section:'Closing', key:'benedictionIntro',label:'Benediction Line',         rows:2, tokens:'{benediction} — blank line printed if name not entered' },
 
   // ── Fast & Testimony ──────────────────────────────────────
-  { section:'Fast & Testimony', key:'fastTestimonyOpen', label:'Personal Testimony Opening', rows:3, tokens:'No tokens' },
   { section:'Fast & Testimony', key:'fastPulpitOpen',    label:'Open the Pulpit',            rows:2, tokens:'No tokens' },
 ];
 
@@ -2351,15 +2348,14 @@ function generateScript() {
   </div>`;
 
   /* -- AFTER SACRAMENT -------------------------------------- */
-  html += say(ph('afterSacrament'));
+  if (!fastSunday) html += say(ph('afterSacrament'));
 
   /* -- PROGRAM --------------------------------------------- */
   const piDoms = [...document.querySelectorAll('.program-item')];
   let closingInsertedBeforeConcludingSpeaker = false;
   if (fastSunday) {
     html += secHead('Fast & Testimony Meeting');
-    html += `<div class="script-fast-block">Bear a brief personal testimony, then open the pulpit to the congregation. Keep testimonies moving. Close as the hour approaches.</div>`;
-    html += say(ph('fastTestimonyOpen'));
+    html += `<div class="script-fast-block">Bear a brief testimony</div>`;
     html += say(ph('fastPulpitOpen'));
   } else if (piDoms.length) {
     html += secHead('Program');
