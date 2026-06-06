@@ -650,6 +650,10 @@ select { cursor: pointer; appearance: none;
           <span class="toggle-label">🌙 Fast &amp; Testimony Sunday</span>
           <span class="toggle-sublabel">First Sunday of the month — no assigned speakers, open testimony meeting</span>
         </div>
+        <div class="form-group narrow hidden" id="testimonyEndTimeGroup">
+          <label>End Testimonies</label>
+          <input type="time" id="testimonyEndTime">
+        </div>
         <label class="toggle fast-sunday">
           <input type="checkbox" id="fastSunday" onchange="onFastSundayChange()">
           <span class="toggle-slider"></span>
@@ -1549,6 +1553,7 @@ window.addEventListener('DOMContentLoaded', () => {
 function onFastSundayChange() {
   const fs = document.getElementById('fastSunday').checked;
   document.getElementById('fastSundayBanner').classList.toggle('show', fs);
+  document.getElementById('testimonyEndTimeGroup')?.classList.toggle('hidden', !fs);
   const btn = document.getElementById('addSpeakerBtn');
   btn.style.opacity = fs ? '.4' : '';
   btn.title = fs ? 'No assigned speakers on Fast Sunday' : '';
@@ -2371,6 +2376,8 @@ function generateScript() {
     html += secHead('Fast & Testimony Meeting');
     html += `<div class="script-fast-block">Bear a brief testimony</div>`;
     html += say(ph('fastPulpitOpen'));
+    const testimonyEnd = formatTime(g('testimonyEndTime'));
+    if (testimonyEnd) html += say(`We will conclude at ${escHtml(testimonyEnd)}.`);
   } else if (piDoms.length) {
     html += secHead('Program');
     const ordinals = ['first','second','third','fourth','fifth','sixth','seventh','eighth'];
@@ -3042,6 +3049,7 @@ function buildMetadata() {
     invocation:            g('invocation')       || '',
     benediction:           g('benediction')      || '',
     is_fast_sunday:        document.getElementById('fastSunday').checked,
+    testimony_end_time:    g('testimonyEndTime') || '',
     is_broadcast:          document.getElementById('broadcastOnline')?.checked !== false,
     opening_hymn_number:   g('openingHymnNum')   || '',
     opening_hymn_title:    g('openingHymnTitle') || '',
@@ -3140,7 +3148,7 @@ function resetMeetingFormState(date, { clearWardName = false } = {}) {
   ['releases','sustainings','newrecords','blessing','apnew','apadv','childbapt','convertbapt'].forEach(k => { const tb=document.querySelector(`#${k}-table tbody`); if(tb) tb.innerHTML=''; if(activeBiz[k]) toggleBusiness(k); });
   if (activeBiz['stake']) toggleBusiness('stake');
   if (activeBiz['letters']) toggleBusiness('letters');
-  const metaIds = ['meetingTime','meetingLocation','presidingName','conductingName','chorister','organist','invocation','benediction','openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
+  const metaIds = ['meetingTime','meetingLocation','presidingName','conductingName','chorister','organist','invocation','benediction','testimonyEndTime','openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
   if (clearWardName) metaIds.unshift('wardName');
   metaIds.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('fastSunday').checked=false; onFastSundayChange();
@@ -3169,6 +3177,7 @@ function loadMeetingFromComponents(components, date, metadata) {
     setV('organist',        m.organist);
     setV('invocation',      m.invocation);
     setV('benediction',     m.benediction);
+    setV('testimonyEndTime',normalizeMeetingTime(m.testimony_end_time));
     setV('openingHymnNum',  m.opening_hymn_number);
     setV('openingHymnTitle',m.opening_hymn_title);
     setV('sacHymnNum',      m.sacrament_hymn_number);
@@ -3299,7 +3308,7 @@ function updateCurrentProgramBanner() {
 // ── Save hooks ─────────────────────────────────────────────────
 function initSaveHooks() {
   // All metadata fields (ward name, presiding, hymns, prayers, etc.) → PATCH /metadata
-  const metaIds = ['wardName','meetingDate','meetingTime','meetingLocation','presidingName','conductingName','fastSunday','broadcastOnline','chorister','organist',
+  const metaIds = ['wardName','meetingDate','meetingTime','meetingLocation','presidingName','conductingName','fastSunday','testimonyEndTime','broadcastOnline','chorister','organist',
                    'invocation','benediction',
                    'openingHymnNum','openingHymnTitle','sacHymnNum','sacHymnTitle','closingHymnNum','closingHymnTitle'];
   metaIds.forEach(id => { const el=document.getElementById(id); if(el) ['input','change'].forEach(ev=>el.addEventListener(ev,()=>schedulePatchMetadata())); });
