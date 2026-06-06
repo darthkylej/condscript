@@ -592,6 +592,7 @@ select { cursor: pointer; appearance: none;
   <button class="tab-btn" id="tbConfig"  onclick="switchTab('config')">⚙ Configuration</button>
   <button class="tab-btn" id="tbHistory" onclick="switchTab('history')">📅 Programs</button>
   <button class="tab-btn" id="tbPeopleHistory" onclick="switchTab('peopleHistory')">🕘 History</button>
+  <button class="tab-btn" id="tbScript" onclick="generateScript()">📄 Script</button>
 </nav>
 
 <!-- ═══════════ BUILDER TAB ═══════════ -->
@@ -1507,6 +1508,7 @@ function escHtml(s) {
 
 /* ── Tab Switching ───────────────────────────────────────────── */
 function switchTab(tab) {
+  activeTabName = tab;
   document.getElementById('app').style.display        = tab === 'builder' ? '' : 'none';
   document.getElementById('configTab').style.display  = tab === 'config'  ? '' : 'none';
   document.getElementById('historyTab').style.display = tab === 'history' ? '' : 'none';
@@ -1515,6 +1517,7 @@ function switchTab(tab) {
   document.getElementById('tbConfig').classList.toggle('active',  tab === 'config');
   document.getElementById('tbHistory').classList.toggle('active', tab === 'history');
   document.getElementById('tbPeopleHistory').classList.toggle('active', tab === 'peopleHistory');
+  document.getElementById('tbScript').classList.remove('active');
   if (tab === 'config')  renderConfigTab();
   if (tab === 'history') loadHistoryTab();
   if (tab === 'peopleHistory') loadPeopleHistory();
@@ -1526,6 +1529,8 @@ let programItems  = [];
 let announcements = [];
 let activeBiz     = {};
 let nextDomId     = Date.now();
+let activeTabName = 'builder';
+let scriptReturnTab = 'builder';
 
 function newDomId(prefix = '') {
   nextDomId += 1;
@@ -2448,6 +2453,9 @@ function generateScript() {
   document.getElementById('scriptTitle').textContent  = `${ward} - ${dateStr}`;
   document.getElementById('scriptContent').innerHTML  = html;
   document.getElementById('scriptView').classList.add('show');
+  scriptReturnTab = activeTabName || 'builder';
+  ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+  document.getElementById('tbScript')?.classList.add('active');
   window.scrollTo(0,0);
 }
 
@@ -2544,6 +2552,7 @@ function toggleMobileMode() {
 
 function closeScript() {
   document.getElementById('scriptView').classList.remove('show');
+  switchTab(scriptReturnTab || 'builder');
 }
 
 /* ── [test mode removed] ─────────────────────────────────────── */
