@@ -2035,15 +2035,12 @@ function buildClosingThanksLine(organist, chorister, { fastSunday = false } = {}
   return configuredLine;
 }
 
-function closingHymnText(num, title) {
-  const parts = [num ? `#${escHtml(num)}` : '', title ? escHtml(title) : ''].filter(Boolean);
-  return parts.length ? parts.join(' - ') : BLANK;
-}
-
 function buildConcludingConductorTransition(organist, chorister, closingNum, closingTitle, benediction) {
   const musicThanks = buildMusicThanksLine(organist, chorister);
   const thanks = `We thank our speakers for their preparation and messages. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}`;
-  return `${thanks}It will now be my privilege to address you. After my remarks, the closing hymn will be ${closingHymnText(closingNum, closingTitle)}, and the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`;
+  return say(`${thanks}It will now be my privilege to address you. After my remarks, we will sing our closing hymn.`) +
+    hymnCallout('Closing Hymn', closingNum, closingTitle) +
+    say(`Following the closing hymn, the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`);
 }
 
 function addVisitor() {
@@ -2444,7 +2441,7 @@ function generateScript() {
         if (isLast && concludingSpeakerIsConductor && !closingInsertedBeforeConcludingSpeaker) {
           const previousIsBreak = el.previousElementSibling?.classList.contains('break');
           if (!previousIsBreak) html += `<div class="script-conduct-break">Conduction Break - you stand here</div>`;
-          html += say(buildConcludingConductorTransition(organist, chorister, closingNum, closingTitle, benediction));
+          html += buildConcludingConductorTransition(organist, chorister, closingNum, closingTitle, benediction);
           closingInsertedBeforeConcludingSpeaker = true;
           followupPrefix = `After ${escHtml(possessiveName(name))} remarks, `;
           return;
