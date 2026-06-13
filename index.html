@@ -965,13 +965,13 @@ select { cursor: pointer; appearance: none;
         <span style="font-size:1.2rem">🌙</span>
         <div><strong>Fast &amp; Testimony Sunday</strong> — No assigned speakers. After the sacrament, bear a brief testimony and open the pulpit.</div>
       </div>
-      <div class="program-toolbar">
+      <div class="program-toolbar" id="programToolbar">
         <button class="btn btn-outline" id="addSpeakerBtn" onclick="addProgramItem('speaker')">🎤 Add Speaker</button>
         <button class="btn btn-secondary" onclick="addProgramItem('hymn')">🎵 Add Intermediate Hymn</button>
         <button class="btn btn-secondary" onclick="addProgramItem('special')">&#9836; Add Special Musical Number</button>
         <button class="btn btn-secondary" onclick="addProgramItem('break')" title="Mark where you stand to conduct between program segments">⏸ Conduction Break</button>
       </div>
-      <p class="text-muted" style="margin-bottom:10px">Use the up and down arrows to reorder. A <strong>Conduction Break</strong> marks where you stand to conduct between program segments.</p>
+      <p class="text-muted" id="programHelpText" style="margin-bottom:10px">Use the up and down arrows to reorder. A <strong>Conduction Break</strong> marks where you stand to conduct between program segments.</p>
       <div class="program-list" id="programList">
         <div class="empty-state" id="programEmpty">No program items yet.</div>
       </div>
@@ -1561,9 +1561,10 @@ function onFastSundayChange() {
   const fs = document.getElementById('fastSunday').checked;
   document.getElementById('fastSundayBanner').classList.toggle('show', fs);
   document.getElementById('testimonyEndTimeGroup')?.classList.toggle('hidden', !fs);
-  const btn = document.getElementById('addSpeakerBtn');
-  btn.style.opacity = fs ? '.4' : '';
-  btn.title = fs ? 'No assigned speakers on Fast Sunday' : '';
+  document.getElementById('programToolbar')?.classList.toggle('hidden', fs);
+  document.getElementById('programHelpText')?.classList.toggle('hidden', fs);
+  document.getElementById('programList')?.classList.toggle('hidden', fs);
+  if (fs) clearProgramItems({ save: !_suppressSaves });
 }
 
 /* ── Announcements ───────────────────────────────────────────── */
@@ -1744,9 +1745,7 @@ function readPersonRows(tableId, hasCallingCol) {
 
 /* ── Program Builder ─────────────────────────────────────────── */
 function addProgramItem(type, preload = null) {
-  if (type === 'speaker' && document.getElementById('fastSunday').checked && !preload) {
-    if (!confirm('Fast Sunday typically has no assigned speakers. Add one anyway?')) return;
-  }
+  if (document.getElementById('fastSunday').checked && !preload) return;
   const id = newDomId('pi-');
   programItems.push({ id, type });
   document.getElementById('programEmpty')?.remove();
@@ -1796,6 +1795,21 @@ function addProgramItem(type, preload = null) {
   updateProgramMoveButtons();
   updateProgramBadge();
   scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], buildProgramComponents);
+}
+
+function clearProgramItems({ save = true } = {}) {
+  programItems = [];
+  const list = document.getElementById('programList');
+  if (list) {
+    list.innerHTML = '';
+    const e = document.createElement('div');
+    e.id = 'programEmpty';
+    e.className = 'empty-state';
+    e.textContent = 'No program items yet.';
+    list.appendChild(e);
+  }
+  updateProgramBadge();
+  if (save) scheduleReplace('prog', ['talk','intermediate_hymn','conduction_break','special_musical_number'], () => []);
 }
 function programControlsHtml(id) {
   return `<div class="program-reorder">
@@ -2019,6 +2033,17 @@ function buildClosingThanksLine(organist, chorister, { fastSunday = false } = {}
   if (/We would like to thank everyone that participated/i.test(configuredLine)) return requestedLine;
   if (/\{(?:organist|chorister)\}/i.test(closingTemplate)) return requestedLine;
   return configuredLine;
+}
+
+function closingHymnText(num, title) {
+  const parts = [num ? `#${escHtml(num)}` : '', title ? escHtml(title) : ''].filter(Boolean);
+  return parts.length ? parts.join(' - ') : BLANK;
+}
+
+function buildConcludingConductorTransition(organist, chorister, closingNum, closingTitle, benediction) {
+  const musicThanks = buildMusicThanksLine(organist, chorister);
+  const thanks = `We thank our speakers for their preparation and messages. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}`;
+  return `${thanks}It will now be my privilege to address you. After my remarks, the closing hymn will be ${closingHymnText(closingNum, closingTitle)}, and the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`;
 }
 
 function addVisitor() {
@@ -2396,7 +2421,8 @@ function generateScript() {
     );
     const lastSpeakerEl = filledSpeakerEls[filledSpeakerEls.length - 1] || null;
     const concludingSpeakerName = lastSpeakerEl ? (document.getElementById(`pi-name-${lastSpeakerEl.id}`)?.value || '').trim() : '';
-    const closingBeforeConcludingSpeaker = samePersonName(concludingSpeakerName, presiding);
+    const concludingSpeakerIsConductor = samePersonName(concludingSpeakerName, conducting);
+    const closingBeforeConcludingSpeaker = !concludingSpeakerIsConductor && samePersonName(concludingSpeakerName, presiding);
 
     let speakerCount = 0;
     let followupPrefix = '';
@@ -2415,6 +2441,14 @@ function generateScript() {
         const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
         const prefix = followupPrefix;
         speakerCount++;
+        if (isLast && concludingSpeakerIsConductor && !closingInsertedBeforeConcludingSpeaker) {
+          const previousIsBreak = el.previousElementSibling?.classList.contains('break');
+          if (!previousIsBreak) html += `<div class="script-conduct-break">Conduction Break - you stand here</div>`;
+          html += say(buildConcludingConductorTransition(organist, chorister, closingNum, closingTitle, benediction));
+          closingInsertedBeforeConcludingSpeaker = true;
+          followupPrefix = `After ${escHtml(possessiveName(name))} remarks, `;
+          return;
+        }
         if (speakerCount === 1 && ordinal !== 'concluding') {
           html += say(`${escHtml(name)} will be our first speaker.`);
         } else if (isLast) {
@@ -3108,6 +3142,7 @@ function buildBusinessComponents(key) {
   });
 }
 function buildProgramComponents() {
+  if (document.getElementById('fastSunday')?.checked) return [];
   const typeMap = { speaker:'talk', hymn:'intermediate_hymn', special:'special_musical_number', break:'conduction_break' };
   syncProgramItemsFromDom();
   return programItems.map((item, i) => {
@@ -3237,7 +3272,9 @@ function loadMeetingFromComponents(components, date, metadata) {
   });
 
   // Program order
-  const progComps=components.filter(c=>['talk','intermediate_hymn','special_musical_number','conduction_break'].includes(c.component_type)).sort((a,b)=>a.component_order-b.component_order);
+  const progComps=document.getElementById('fastSunday').checked
+    ? []
+    : components.filter(c=>['talk','intermediate_hymn','special_musical_number','conduction_break'].includes(c.component_type)).sort((a,b)=>a.component_order-b.component_order);
   if (progComps.length) {
     programItems=[]; document.getElementById('programList').innerHTML='';
     const em=document.createElement('div'); em.id='programEmpty'; em.className='empty-state'; em.textContent='No program items yet.'; document.getElementById('programList').appendChild(em);
