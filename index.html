@@ -2422,11 +2422,16 @@ function generateScript() {
     const closingBeforeConcludingSpeaker = !concludingSpeakerIsConductor && samePersonName(concludingSpeakerName, presiding);
 
     let speakerCount = 0;
-    let followupPrefix = '';
+    let previousProgramType = '';
+    let previousSpeakerName = '';
+    let transitionIndex = 0;
+    let lastTransitionKey = '';
+    const transitionSeedBase = g('meetingDate') || currentMeetingDate || '';
 
     piDoms.forEach(el => {
       if (el.classList.contains('break')) {
-        followupPrefix = '';
+        previousProgramType = 'break';
+        lastTransitionKey = '';
         html += `<div class="script-conduct-break">⏸ &nbsp; Conduction Break — you stand here</div>`;
         return;
       }
@@ -2436,43 +2441,76 @@ function generateScript() {
         if (!name) return; // skip empty speakers
         const isLast = el === lastSpeakerEl;
         const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
-        const prefix = followupPrefix;
         speakerCount++;
         if (isLast && concludingSpeakerIsConductor && !closingInsertedBeforeConcludingSpeaker) {
           const previousIsBreak = el.previousElementSibling?.classList.contains('break');
           if (!previousIsBreak) html += `<div class="script-conduct-break">Conduction Break - you stand here</div>`;
           html += buildConcludingConductorTransition(organist, chorister, closingNum, closingTitle, benediction);
           closingInsertedBeforeConcludingSpeaker = true;
-          followupPrefix = `After ${escHtml(possessiveName(name))} remarks, `;
+          previousProgramType = 'speaker';
+          previousSpeakerName = name;
           return;
         }
         if (speakerCount === 1 && ordinal !== 'concluding') {
           html += say(`${escHtml(name)} will be our first speaker.`);
         } else if (isLast) {
-          html += say(`${prefix}${escHtml(name)} will be our concluding speaker.`);
+          const transition = buildSpeakerTransition({
+            name,
+            role: 'concluding',
+            previousType: previousProgramType,
+            previousSpeaker: previousSpeakerName,
+            seed: `${transitionSeedBase}|speaker|${transitionIndex++}`,
+            avoidKey: lastTransitionKey
+          });
+          html += say(transition.text);
+          lastTransitionKey = transition.key;
         } else {
-          html += say(`${prefix || 'We '}will hear from ${escHtml(name)}.`);
+          const transition = buildSpeakerTransition({
+            name,
+            role: 'speaker',
+            previousType: previousProgramType,
+            previousSpeaker: previousSpeakerName,
+            seed: `${transitionSeedBase}|speaker|${transitionIndex++}`,
+            avoidKey: lastTransitionKey
+          });
+          html += say(transition.text);
+          lastTransitionKey = transition.key;
         }
         if (isLast && closingBeforeConcludingSpeaker && !closingInsertedBeforeConcludingSpeaker) {
           html += closingBlock();
           closingInsertedBeforeConcludingSpeaker = true;
         }
-        followupPrefix = `After ${escHtml(possessiveName(name))} remarks, `;
+        previousProgramType = 'speaker';
+        previousSpeakerName = name;
       } else if (el.classList.contains('hymn')) {
         const hnum   = (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim();
         const htitle = (document.getElementById(`pi-htitle-${el.id}`)?.value || '').trim();
         if (!hnum && !htitle) return; // skip empty hymns
-        const lead = followupPrefix ? `${followupPrefix}the congregation` : 'The congregation';
-        html += say(`${lead} will then sing an intermediate hymn.`);
+        const transition = buildIntermediateHymnTransition({
+          previousType: previousProgramType,
+          previousSpeaker: previousSpeakerName,
+          seed: `${transitionSeedBase}|hymn|${transitionIndex++}`,
+          avoidKey: lastTransitionKey
+        });
+        html += say(transition.text);
         html += hymnCallout('Intermediate Hymn', hnum, htitle);
-        followupPrefix = 'After which, ';
+        previousProgramType = 'hymn';
+        lastTransitionKey = transition.key;
       } else if (el.classList.contains('special')) {
         const title = (document.getElementById(`pi-special-title-${el.id}`)?.value || '').trim();
         const by    = (document.getElementById(`pi-special-by-${el.id}`)?.value || '').trim();
         if (!title && !by) return;
-        const lead = followupPrefix ? `${followupPrefix}we` : 'We';
-        html += say(`${lead} will then have a special musical number ${title ? escHtml(title) : BLANK} by ${by ? escHtml(by) : BLANK}.`);
-        followupPrefix = 'After which, ';
+        const transition = buildSpecialMusicTransition({
+          title,
+          by,
+          previousType: previousProgramType,
+          previousSpeaker: previousSpeakerName,
+          seed: `${transitionSeedBase}|special|${transitionIndex++}`,
+          avoidKey: lastTransitionKey
+        });
+        html += say(transition.text);
+        previousProgramType = 'special';
+        lastTransitionKey = transition.key;
       }
     });
   }
@@ -2536,6 +2574,151 @@ function g(id) { return (document.getElementById(id)?.value || '').trim(); }
 
 function possessiveName(name) {
   return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
+
+function seededHash(value) {
+  let hash = 2166136261;
+  const text = String(value || '');
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function chooseSeeded(options, seed, avoidKey = '') {
+  const choices = options.filter(option => option.key !== avoidKey);
+  const pool = choices.length ? choices : options;
+  return pool[seededHash(seed) % pool.length];
+}
+
+function shortSpeakerName(name) {
+  const clean = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!clean) return '';
+  const parts = clean.split(' ');
+  const titleMap = {
+    brother: 'Brother',
+    bro: 'Brother',
+    sister: 'Sister',
+    sis: 'Sister',
+    elder: 'Elder',
+    president: 'President',
+    bishop: 'Bishop'
+  };
+  const first = parts[0].replace(/[.]/g, '').toLowerCase();
+  const title = titleMap[first] || '';
+  const last = parts[parts.length - 1] || clean;
+  return title && parts.length > 1 ? `${title} ${last}` : last;
+}
+
+function possessiveShortSpeakerName(name) {
+  return possessiveName(shortSpeakerName(name) || name);
+}
+
+function buildSpeakerTransition({ name, role = 'speaker', previousType, previousSpeaker, seed, avoidKey }) {
+  const safeName = escHtml(name);
+  const safePrev = escHtml(possessiveShortSpeakerName(previousSpeaker));
+  let options;
+  if (previousType === 'speaker' && previousSpeaker) {
+    options = role === 'concluding' ? [
+      { key: 'after-prev-concluding', text: `After ${safePrev} remarks, ${safeName} will be our concluding speaker.` },
+      { key: 'then-concluding', text: `We will then hear from our concluding speaker, ${safeName}.` },
+      { key: 'our-concluding', text: `Our concluding speaker will be ${safeName}.` },
+      { key: 'will-be-concluding', text: `${safeName} will be our concluding speaker.` }
+    ] : [
+      { key: 'after-prev-speaker', text: `After ${safePrev} remarks, we will hear from ${safeName}.` },
+      { key: 'then-hear', text: `We will then hear from ${safeName}.` },
+      { key: 'next-speaker', text: `Our next speaker will be ${safeName}.` },
+      { key: 'will-address', text: `${safeName} will then address us.` }
+    ];
+  } else if (previousType === 'hymn') {
+    options = role === 'concluding' ? [
+      { key: 'following-hymn-concluding', text: `Following the hymn, ${safeName} will be our concluding speaker.` },
+      { key: 'after-hymn-concluding', text: `After the hymn, we will hear from our concluding speaker, ${safeName}.` },
+      { key: 'then-concluding-after-hymn', text: `We will then hear from our concluding speaker, ${safeName}.` }
+    ] : [
+      { key: 'following-hymn-speaker', text: `Following the hymn, we will hear from ${safeName}.` },
+      { key: 'after-hymn-address', text: `After the hymn, ${safeName} will address us.` },
+      { key: 'then-hear-after-hymn', text: `We will then hear from ${safeName}.` }
+    ];
+  } else if (previousType === 'special') {
+    options = role === 'concluding' ? [
+      { key: 'following-special-concluding', text: `Following the special musical number, ${safeName} will be our concluding speaker.` },
+      { key: 'after-special-concluding', text: `After the special musical number, we will hear from our concluding speaker, ${safeName}.` },
+      { key: 'then-concluding-after-special', text: `We will then hear from our concluding speaker, ${safeName}.` }
+    ] : [
+      { key: 'following-special-speaker', text: `Following the special musical number, we will hear from ${safeName}.` },
+      { key: 'after-special-address', text: `After the special musical number, ${safeName} will address us.` },
+      { key: 'then-hear-after-special', text: `We will then hear from ${safeName}.` }
+    ];
+  } else if (previousType === 'break') {
+    options = role === 'concluding' ? [
+      { key: 'now-concluding', text: `We will now hear from our concluding speaker, ${safeName}.` },
+      { key: 'concluding-now-address', text: `${safeName} will now address us as our concluding speaker.` },
+      { key: 'our-concluding-now', text: `Our concluding speaker will now be ${safeName}.` }
+    ] : [
+      { key: 'now-hear', text: `We will now hear from ${safeName}.` },
+      { key: 'now-address', text: `${safeName} will now address us.` },
+      { key: 'next-now', text: `Our next speaker will now be ${safeName}.` }
+    ];
+  } else {
+    options = role === 'concluding' ? [
+      { key: 'concluding-default', text: `${safeName} will be our concluding speaker.` },
+      { key: 'our-concluding-default', text: `Our concluding speaker will be ${safeName}.` }
+    ] : [
+      { key: 'hear-default', text: `We will hear from ${safeName}.` },
+      { key: 'next-default', text: `Our next speaker will be ${safeName}.` }
+    ];
+  }
+  return chooseSeeded(options, seed, avoidKey);
+}
+
+function buildIntermediateHymnTransition({ previousType, previousSpeaker, seed, avoidKey }) {
+  let options;
+  if (previousType === 'break' || !previousType) {
+    options = [
+      { key: 'congregation-now-sing', text: 'The congregation will now sing an intermediate hymn.' },
+      { key: 'congregation-now-join', text: 'The congregation will now join in singing an intermediate hymn.' }
+    ];
+  } else if (previousType === 'speaker' && previousSpeaker) {
+    const safePrev = escHtml(possessiveShortSpeakerName(previousSpeaker));
+    options = [
+      { key: 'after-prev-congregation-then', text: `After ${safePrev} remarks, the congregation will then sing an intermediate hymn.` },
+      { key: 'following-prev-congregation-then', text: `Following ${safePrev} remarks, the congregation will then sing an intermediate hymn.` },
+      { key: 'congregation-then-sing', text: 'The congregation will then sing an intermediate hymn.' }
+    ];
+  } else {
+    options = [
+      { key: 'congregation-then-sing', text: 'The congregation will then sing an intermediate hymn.' },
+      { key: 'congregation-then-join', text: 'The congregation will then join in singing an intermediate hymn.' }
+    ];
+  }
+  return chooseSeeded(options, seed, avoidKey);
+}
+
+function buildSpecialMusicTransition({ title, by, previousType, previousSpeaker, seed, avoidKey }) {
+  const safeTitle = title ? escHtml(title) : BLANK;
+  const safeBy = by ? escHtml(by) : BLANK;
+  let options;
+  if (previousType === 'break' || !previousType) {
+    options = [
+      { key: 'now-special', text: `We will now have a special musical number ${safeTitle} by ${safeBy}.` },
+      { key: 'special-now', text: `A special musical number ${safeTitle} will now be performed by ${safeBy}.` }
+    ];
+  } else if (previousType === 'speaker' && previousSpeaker) {
+    const safePrev = escHtml(possessiveShortSpeakerName(previousSpeaker));
+    options = [
+      { key: 'after-prev-special', text: `After ${safePrev} remarks, we will then have a special musical number ${safeTitle} by ${safeBy}.` },
+      { key: 'following-prev-special', text: `Following ${safePrev} remarks, we will have a special musical number ${safeTitle} by ${safeBy}.` },
+      { key: 'then-special', text: `We will then have a special musical number ${safeTitle} by ${safeBy}.` }
+    ];
+  } else {
+    options = [
+      { key: 'then-special', text: `We will then have a special musical number ${safeTitle} by ${safeBy}.` },
+      { key: 'continue-special', text: `We will continue with a special musical number ${safeTitle} by ${safeBy}.` }
+    ];
+  }
+  return chooseSeeded(options, seed, avoidKey);
 }
 
 // Given a raw date string and the meeting date, returns " this Thursday", " last Friday",
