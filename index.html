@@ -2067,13 +2067,16 @@ function normalizeClosingThanksSpacing(line) {
   return String(line || '').replace(/(for the music\.)(?=\S)/gi, '$1 ');
 }
 
-function buildClosingThanksLine(organist, chorister, { fastSunday = false, includeSpeakerThanks = true } = {}) {
+function buildClosingThanksLine(organist, chorister, { fastSunday = false, includeSpeakerThanks = true, speakerThanksName = '' } = {}) {
   const musicThanks = buildMusicThanksLine(organist, chorister);
   if (fastSunday) return normalizeClosingThanksSpacing(ph('closingThanksFast', { musicThanks }));
+  const speakerThanks = speakerThanksName
+    ? `We thank ${escHtml(speakerThanksName)} for the preparation and message.`
+    : 'We thank our speakers for their preparation and messages.';
   const requestedLine = normalizeClosingThanksSpacing(
-    `We thank everyone who has participated in our sacrament service today. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}${includeSpeakerThanks ? 'We thank our speakers for their preparation and messages.' : ''}`.trim()
+    `We thank everyone who has participated in our sacrament service today. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}${includeSpeakerThanks ? speakerThanks : ''}`.trim()
   );
-  if (!includeSpeakerThanks) return requestedLine;
+  if (!includeSpeakerThanks || speakerThanksName) return requestedLine;
   const closingTemplate = (CONFIG.closingThanks !== undefined ? CONFIG.closingThanks : DEFAULT_PHRASES.closingThanks) || '';
   const configuredLine = ph('closingThanks', { musicThanks });
   if (/We would like to thank everyone that participated/i.test(configuredLine)) return requestedLine;
@@ -2089,9 +2092,9 @@ function buildConcludingConductorTransition(organist, chorister, closingNum, clo
     say(`Following the closing hymn, the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`);
 }
 
-function buildClosingAfterConcludingSpeakerTransition(concludingSpeakerName, organist, chorister, closingNum, closingTitle, benediction, { fastSunday = false, includeThanks = true, includeSpeakerThanks = true } = {}) {
+function buildClosingAfterConcludingSpeakerTransition(concludingSpeakerName, organist, chorister, closingNum, closingTitle, benediction, { fastSunday = false, includeThanks = true, includeSpeakerThanks = true, speakerThanksName = '' } = {}) {
   const speaker = escHtml(possessiveShortSpeakerName(concludingSpeakerName));
-  const thanks = includeThanks ? `${buildClosingThanksLine(organist, chorister, { fastSunday, includeSpeakerThanks })} ` : '';
+  const thanks = includeThanks ? `${buildClosingThanksLine(organist, chorister, { fastSunday, includeSpeakerThanks, speakerThanksName })} ` : '';
   return say(`${thanks}Following ${speaker} remarks, we will sing our closing hymn.`) +
     hymnCallout('Closing Hymn', closingNum, closingTitle) +
     say(`Following the closing hymn, the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`);
@@ -2207,8 +2210,8 @@ function generateScript() {
   const sacTitle   = g('sacHymnTitle');
   const closingNum = g('closingHymnNum');
   const closingTitle=g('closingHymnTitle');
-  const closingBlock = ({ includeSpeakerThanks = true } = {}) =>
-    say(buildClosingThanksLine(organist, chorister, { fastSunday, includeSpeakerThanks })) +
+  const closingBlock = ({ includeSpeakerThanks = true, speakerThanksName = '' } = {}) =>
+    say(buildClosingThanksLine(organist, chorister, { fastSunday, includeSpeakerThanks, speakerThanksName })) +
     hymnSection('closingHymnIntro', 'Closing Hymn', closingNum, closingTitle) +
     say(ph('benedictionIntro', { benediction: benediction || BLANK }));
 
@@ -2450,7 +2453,7 @@ function generateScript() {
   </div>`;
 
   const piDoms = [...document.querySelectorAll('.program-item')];
-  const firstProgramEl = piDoms.find(el => {
+  const programItemHasContent = (el) => {
     if (el.classList.contains('speaker')) return (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
     if (el.classList.contains('hymn')) {
       return (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim() ||
@@ -2461,16 +2464,31 @@ function generateScript() {
         (document.getElementById(`pi-special-by-${el.id}`)?.value || '').trim();
     }
     return false;
-  }) || null;
+  };
+  const meaningfulProgramEls = piDoms.filter(programItemHasContent);
+  const firstProgramEl = meaningfulProgramEls[0] || null;
+  const filledSpeakerEls = piDoms.filter(el =>
+    el.classList.contains('speaker') &&
+    (document.getElementById(`pi-name-${el.id}`)?.value || '').trim()
+  );
+  const singleProgramSpeakerEl = filledSpeakerEls.length === 1 ? filledSpeakerEls[0] : null;
+  const singleProgramSpeakerName = singleProgramSpeakerEl ? (document.getElementById(`pi-name-${singleProgramSpeakerEl.id}`)?.value || '').trim() : '';
+  const onlyProgramItemIsSingleSpeaker = meaningfulProgramEls.length === 1 && meaningfulProgramEls[0] === singleProgramSpeakerEl;
   const firstProgramSpeakerIsConductor =
     !fastSunday &&
     firstProgramEl?.classList.contains('speaker') &&
     samePersonName((document.getElementById(`pi-name-${firstProgramEl.id}`)?.value || '').trim(), conducting);
 
   /* -- AFTER SACRAMENT -------------------------------------- */
-  html += say(firstProgramSpeakerIsConductor
-    ? 'Thank you for your reverence during the sacred ordinance of the sacrament. It will now be my privilege to address you.'
-    : ph(fastSunday ? 'afterSacramentFast' : 'afterSacrament'));
+  let afterSacramentLine = ph(fastSunday ? 'afterSacramentFast' : 'afterSacrament');
+  if (onlyProgramItemIsSingleSpeaker) {
+    afterSacramentLine = firstProgramSpeakerIsConductor
+      ? 'Thank you for your reverence during the sacred ordinance of the sacrament. It will now be my privilege to address you.'
+      : `Thank you for your reverence during the sacred ordinance of the sacrament. ${escHtml(singleProgramSpeakerName)} will now address us.`;
+  } else if (firstProgramSpeakerIsConductor) {
+    afterSacramentLine = 'Thank you for your reverence during the sacred ordinance of the sacrament. It will now be my privilege to address you.';
+  }
+  html += say(afterSacramentLine);
 
   /* -- PROGRAM --------------------------------------------- */
   let closingInsertedBeforeConcludingSpeaker = false;
@@ -2484,11 +2502,7 @@ function generateScript() {
     html += secHead('Program');
     const ordinals = ['first','second','third','fourth','fifth','sixth','seventh','eighth'];
 
-    // Pre-identify the last filled speaker (gets "concluding" label)
-    const filledSpeakerEls = piDoms.filter(el =>
-      el.classList.contains('speaker') &&
-      (document.getElementById(`pi-name-${el.id}`)?.value || '').trim()
-    );
+    // Pre-identify the last filled speaker (gets "concluding" label unless they are the only speaker)
     const lastSpeakerEl = filledSpeakerEls[filledSpeakerEls.length - 1] || null;
     const concludingSpeakerName = lastSpeakerEl ? (document.getElementById(`pi-name-${lastSpeakerEl.id}`)?.value || '').trim() : '';
     const concludingSpeakerIsConductor = samePersonName(concludingSpeakerName, conducting);
@@ -2599,6 +2613,42 @@ function generateScript() {
         const isLast = el === lastSpeakerEl;
         const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
         speakerCount++;
+        if (el === singleProgramSpeakerEl) {
+          if (!onlyProgramItemIsSingleSpeaker) {
+            const transition = previousProgramType || previousSpeakerName
+              ? buildSpeakerTransition({
+                  name,
+                  role: 'speaker',
+                  previousType: previousProgramType,
+                  previousSpeaker: previousSpeakerName,
+                  seed: `${transitionSeedBase}|speaker|${transitionIndex++}`,
+                  avoidKey: lastTransitionKey
+                })
+              : { key: 'single-speaker-now', text: `${escHtml(name)} will now address us.` };
+            html += say(transition.text);
+            lastTransitionKey = transition.key;
+          }
+          if (onlyProgramItemIsSingleSpeaker && samePersonName(name, presiding) && !closingInsertedBeforeConcludingSpeaker) {
+            html += buildClosingAfterConcludingSpeakerTransition(name, organist, chorister, closingNum, closingTitle, benediction, {
+              fastSunday,
+              includeThanks: false
+            });
+            closingInsertedBeforeConcludingSpeaker = true;
+          } else if (!onlyProgramItemIsSingleSpeaker && samePersonName(name, presiding) && isLast && !closingInsertedBeforeConcludingSpeaker) {
+            html += buildClosingAfterConcludingSpeakerTransition(name, organist, chorister, closingNum, closingTitle, benediction, {
+              fastSunday,
+              includeThanks: false
+            });
+            closingInsertedBeforeConcludingSpeaker = true;
+          } else if (onlyProgramItemIsSingleSpeaker && !closingInsertedBeforeConcludingSpeaker) {
+            html += `<div class="script-conduct-break">After ${escHtml(possessiveShortSpeakerName(name))} remarks - announce the closing hymn and benediction</div>`;
+            html += closingBlock({ speakerThanksName: name });
+            closingInsertedBeforeConcludingSpeaker = true;
+          }
+          previousProgramType = 'speaker';
+          previousSpeakerName = name;
+          return;
+        }
         if (firstProgramSpeakerIsConductor && el === firstProgramEl && isLast && concludingSpeakerIsConductor && !closingInsertedBeforeConcludingSpeaker) {
           html += `<div class="script-conduct-break">After your remarks - announce the closing hymn and benediction</div>`;
           html += closingBlock({ includeSpeakerThanks: false });
@@ -2691,7 +2741,9 @@ function generateScript() {
   /* -- CLOSING --------------------------------------------- */
   if (!closingInsertedBeforeConcludingSpeaker) {
     html += secHead('Closing');
-    html += closingBlock();
+    html += closingBlock({
+      speakerThanksName: filledSpeakerEls.length === 1 ? singleProgramSpeakerName : ''
+    });
   }
   /* -- Render ---------------------------------------------- */
   document.getElementById('scriptTitle').textContent  = `${ward} - ${dateStr}`;
