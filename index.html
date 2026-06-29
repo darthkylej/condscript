@@ -2207,8 +2207,8 @@ function generateScript() {
   const sacTitle   = g('sacHymnTitle');
   const closingNum = g('closingHymnNum');
   const closingTitle=g('closingHymnTitle');
-  const closingBlock = () =>
-    say(buildClosingThanksLine(organist, chorister, { fastSunday })) +
+  const closingBlock = ({ includeSpeakerThanks = true } = {}) =>
+    say(buildClosingThanksLine(organist, chorister, { fastSunday, includeSpeakerThanks })) +
     hymnSection('closingHymnIntro', 'Closing Hymn', closingNum, closingTitle) +
     say(ph('benedictionIntro', { benediction: benediction || BLANK }));
 
@@ -2449,11 +2449,30 @@ function generateScript() {
     <div class="sac-sub">Administration of the sacrament</div>
   </div>`;
 
+  const piDoms = [...document.querySelectorAll('.program-item')];
+  const firstProgramEl = piDoms.find(el => {
+    if (el.classList.contains('speaker')) return (document.getElementById(`pi-name-${el.id}`)?.value || '').trim();
+    if (el.classList.contains('hymn')) {
+      return (document.getElementById(`pi-hnum-${el.id}`)?.value || '').trim() ||
+        (document.getElementById(`pi-htitle-${el.id}`)?.value || '').trim();
+    }
+    if (el.classList.contains('special')) {
+      return (document.getElementById(`pi-special-title-${el.id}`)?.value || '').trim() ||
+        (document.getElementById(`pi-special-by-${el.id}`)?.value || '').trim();
+    }
+    return false;
+  }) || null;
+  const firstProgramSpeakerIsConductor =
+    !fastSunday &&
+    firstProgramEl?.classList.contains('speaker') &&
+    samePersonName((document.getElementById(`pi-name-${firstProgramEl.id}`)?.value || '').trim(), conducting);
+
   /* -- AFTER SACRAMENT -------------------------------------- */
-  html += say(ph(fastSunday ? 'afterSacramentFast' : 'afterSacrament'));
+  html += say(firstProgramSpeakerIsConductor
+    ? 'It will now be my privilege to address you.'
+    : ph(fastSunday ? 'afterSacramentFast' : 'afterSacrament'));
 
   /* -- PROGRAM --------------------------------------------- */
-  const piDoms = [...document.querySelectorAll('.program-item')];
   let closingInsertedBeforeConcludingSpeaker = false;
   if (fastSunday) {
     html += secHead('Fast & Testimony Meeting');
@@ -2580,6 +2599,14 @@ function generateScript() {
         const isLast = el === lastSpeakerEl;
         const ordinal = isLast ? 'concluding' : (ordinals[speakerCount] || `${speakerCount+1}th`);
         speakerCount++;
+        if (firstProgramSpeakerIsConductor && el === firstProgramEl && isLast && concludingSpeakerIsConductor && !closingInsertedBeforeConcludingSpeaker) {
+          html += `<div class="script-conduct-break">After your remarks - announce the closing hymn and benediction</div>`;
+          html += closingBlock({ includeSpeakerThanks: false });
+          closingInsertedBeforeConcludingSpeaker = true;
+          previousProgramType = 'speaker';
+          previousSpeakerName = name;
+          return;
+        }
         if (isLast && concludingSpeakerIsConductor && !closingInsertedBeforeConcludingSpeaker) {
           const previousIsBreak = el.previousElementSibling?.classList.contains('break');
           if (!previousIsBreak) html += `<div class="script-conduct-break">Conduction Break - you stand here</div>`;
@@ -2589,7 +2616,9 @@ function generateScript() {
           previousSpeakerName = name;
           return;
         }
-        if (speakerCount === 1 && ordinal !== 'concluding') {
+        if (firstProgramSpeakerIsConductor && el === firstProgramEl) {
+          // Already introduced immediately after the sacrament.
+        } else if (speakerCount === 1 && ordinal !== 'concluding') {
           html += say(`${escHtml(name)} will be our first speaker.`);
         } else if (isLast) {
           const transition = buildSpeakerTransition({
