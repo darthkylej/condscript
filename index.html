@@ -2063,15 +2063,22 @@ function buildMusicThanksLine(organist, chorister) {
   return names.length ? `We thank ${naturalJoin(names)} for the music.` : '';
 }
 
-function buildClosingThanksLine(organist, chorister, { fastSunday = false } = {}) {
+function normalizeClosingThanksSpacing(line) {
+  return String(line || '').replace(/(for the music\.)(?=\S)/gi, '$1 ');
+}
+
+function buildClosingThanksLine(organist, chorister, { fastSunday = false, includeSpeakerThanks = true } = {}) {
   const musicThanks = buildMusicThanksLine(organist, chorister);
-  if (fastSunday) return ph('closingThanksFast', { musicThanks });
-  const requestedLine = `We thank everyone who has participated in our sacrament service today. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}We thank our speakers for their preparation and messages.`;
+  if (fastSunday) return normalizeClosingThanksSpacing(ph('closingThanksFast', { musicThanks }));
+  const requestedLine = normalizeClosingThanksSpacing(
+    `We thank everyone who has participated in our sacrament service today. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}${includeSpeakerThanks ? 'We thank our speakers for their preparation and messages.' : ''}`.trim()
+  );
+  if (!includeSpeakerThanks) return requestedLine;
   const closingTemplate = (CONFIG.closingThanks !== undefined ? CONFIG.closingThanks : DEFAULT_PHRASES.closingThanks) || '';
   const configuredLine = ph('closingThanks', { musicThanks });
   if (/We would like to thank everyone that participated/i.test(configuredLine)) return requestedLine;
   if (/\{(?:organist|chorister)\}/i.test(closingTemplate)) return requestedLine;
-  return configuredLine;
+  return normalizeClosingThanksSpacing(configuredLine);
 }
 
 function buildConcludingConductorTransition(organist, chorister, closingNum, closingTitle, benediction) {
@@ -2082,9 +2089,10 @@ function buildConcludingConductorTransition(organist, chorister, closingNum, clo
     say(`Following the closing hymn, the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`);
 }
 
-function buildClosingAfterConcludingSpeakerTransition(concludingSpeakerName, organist, chorister, closingNum, closingTitle, benediction, { fastSunday = false } = {}) {
+function buildClosingAfterConcludingSpeakerTransition(concludingSpeakerName, organist, chorister, closingNum, closingTitle, benediction, { fastSunday = false, includeThanks = true, includeSpeakerThanks = true } = {}) {
   const speaker = escHtml(possessiveShortSpeakerName(concludingSpeakerName));
-  return say(`${buildClosingThanksLine(organist, chorister, { fastSunday })} Following ${speaker} remarks, we will sing our closing hymn.`) +
+  const thanks = includeThanks ? `${buildClosingThanksLine(organist, chorister, { fastSunday, includeSpeakerThanks })} ` : '';
+  return say(`${thanks}Following ${speaker} remarks, we will sing our closing hymn.`) +
     hymnCallout('Closing Hymn', closingNum, closingTitle) +
     say(`Following the closing hymn, the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`);
 }
@@ -2485,6 +2493,11 @@ function generateScript() {
 
     const announceRemainingProgramAfterConductor = (currentEl) => {
       html += `<div class="script-conduct-break">After your remarks - announce the remainder of the meeting, then be seated</div>`;
+      const previousSpeakerCount = filledSpeakerEls.filter(el => piDoms.indexOf(el) < piDoms.indexOf(currentEl)).length;
+      html += say(buildClosingThanksLine(organist, chorister, {
+        fastSunday,
+        includeSpeakerThanks: previousSpeakerCount > 0
+      }));
       let remainderPreviousType = 'break';
       let remainderPreviousSpeaker = '';
 
@@ -2506,7 +2519,10 @@ function generateScript() {
           html += say(transition.text);
           lastTransitionKey = transition.key;
           if (nextIsLast && closingBeforeConcludingSpeaker && !closingInsertedBeforeConcludingSpeaker) {
-            html += buildClosingAfterConcludingSpeakerTransition(nextName, organist, chorister, closingNum, closingTitle, benediction, { fastSunday });
+            html += buildClosingAfterConcludingSpeakerTransition(nextName, organist, chorister, closingNum, closingTitle, benediction, {
+              fastSunday,
+              includeThanks: false
+            });
             closingInsertedBeforeConcludingSpeaker = true;
           }
           remainderPreviousType = 'speaker';
