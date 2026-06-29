@@ -1992,6 +1992,38 @@ function visitorRecognitionPart(v) {
   return /^of\s/i.test(recognition) ? `${name} ${safeRecognition}` : `${name}, ${safeRecognition}`;
 }
 
+function visitorRecognitionKey(v) {
+  const info = visitorInfo(v);
+  return v.hcOnAssignment ? 'of the stake high council' : (info.recognition || info.desc || '');
+}
+
+function pluralVisitorRecognition(recognition) {
+  const text = String(recognition || '').trim();
+  const lower = text.toLowerCase();
+  const irregular = {
+    'a counselor in the stake presidency': 'counselors in the stake presidency',
+    'of the stake high council': 'of the stake high council',
+    'the stake president': 'the stake president',
+    'the mission president': 'the mission president',
+    'the temple president': 'the temple president',
+    'the temple matron': 'the temple matron'
+  };
+  if (irregular[lower]) return irregular[lower];
+  if (/^a member of /i.test(text)) return text.replace(/^a member of /i, 'members of ');
+  if (/^an area seventy$/i.test(text)) return 'Area Seventies';
+  if (/^an? /i.test(text)) return text.replace(/^an? /i, '');
+  return text;
+}
+
+function visitorRecognitionGroupPart(group) {
+  const names = naturalJoin(group.visitors.map(v => escHtml(v.name || '[Name]')));
+  if (group.visitors.length === 1) return visitorRecognitionPart(group.visitors[0]);
+  const recognition = pluralVisitorRecognition(group.recognition);
+  if (!recognition) return names;
+  const safeRecognition = escHtml(recognition);
+  return /^of\s/i.test(recognition) ? `${names} ${safeRecognition}` : `${names}, ${safeRecognition}`;
+}
+
 function naturalJoin(parts) {
   if (parts.length <= 1) return parts[0] || '';
   if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
@@ -1999,7 +2031,14 @@ function naturalJoin(parts) {
 }
 
 function buildVisitorRecognitionLine(recognizedVisitors) {
-  const parts = recognizedVisitors.map(visitorRecognitionPart);
+  const groups = [];
+  recognizedVisitors.forEach(v => {
+    const recognition = visitorRecognitionKey(v);
+    const existing = groups.find(group => group.recognition === recognition);
+    if (existing) existing.visitors.push(v);
+    else groups.push({ recognition, visitors: [v] });
+  });
+  const parts = groups.map(visitorRecognitionGroupPart);
   return parts.length ? `We recognize ${naturalJoin(parts)}, sitting on the stand with us today.` : '';
 }
 
@@ -2039,6 +2078,13 @@ function buildConcludingConductorTransition(organist, chorister, closingNum, clo
   const musicThanks = buildMusicThanksLine(organist, chorister);
   const thanks = `We thank our speakers for their preparation and messages. ${musicThanks ? `${escHtml(musicThanks)} ` : ''}`;
   return say(`${thanks}It will now be my privilege to address you. After my remarks, we will sing our closing hymn.`) +
+    hymnCallout('Closing Hymn', closingNum, closingTitle) +
+    say(`Following the closing hymn, the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`);
+}
+
+function buildClosingAfterConcludingSpeakerTransition(concludingSpeakerName, organist, chorister, closingNum, closingTitle, benediction, { fastSunday = false } = {}) {
+  const speaker = escHtml(possessiveShortSpeakerName(concludingSpeakerName));
+  return say(`${buildClosingThanksLine(organist, chorister, { fastSunday })} Following ${speaker} remarks, we will sing our closing hymn.`) +
     hymnCallout('Closing Hymn', closingNum, closingTitle) +
     say(`Following the closing hymn, the benediction will be offered by ${benediction ? escHtml(benediction) : BLANK}.`);
 }
@@ -2420,6 +2466,14 @@ function generateScript() {
     const concludingSpeakerName = lastSpeakerEl ? (document.getElementById(`pi-name-${lastSpeakerEl.id}`)?.value || '').trim() : '';
     const concludingSpeakerIsConductor = samePersonName(concludingSpeakerName, conducting);
     const closingBeforeConcludingSpeaker = !concludingSpeakerIsConductor && samePersonName(concludingSpeakerName, presiding);
+    const conductorSpeakerEl = filledSpeakerEls.find(el =>
+      samePersonName((document.getElementById(`pi-name-${el.id}`)?.value || '').trim(), conducting)
+    ) || null;
+    const conductorPreannouncesRemainder =
+      closingBeforeConcludingSpeaker &&
+      conductorSpeakerEl &&
+      conductorSpeakerEl !== lastSpeakerEl &&
+      piDoms.indexOf(conductorSpeakerEl) < piDoms.indexOf(lastSpeakerEl);
 
     let speakerCount = 0;
     let previousProgramType = '';
@@ -2427,8 +2481,76 @@ function generateScript() {
     let transitionIndex = 0;
     let lastTransitionKey = '';
     const transitionSeedBase = g('meetingDate') || currentMeetingDate || '';
+    let skipRemainingProgramAnnouncements = false;
+
+    const announceRemainingProgramAfterConductor = (currentEl) => {
+      html += `<div class="script-conduct-break">After your remarks - announce the remainder of the meeting, then be seated</div>`;
+      let remainderPreviousType = 'break';
+      let remainderPreviousSpeaker = '';
+
+      piDoms.slice(piDoms.indexOf(currentEl) + 1).forEach(nextEl => {
+        if (nextEl.classList.contains('break')) return;
+
+        if (nextEl.classList.contains('speaker')) {
+          const nextName = (document.getElementById(`pi-name-${nextEl.id}`)?.value || '').trim();
+          if (!nextName) return;
+          const nextIsLast = nextEl === lastSpeakerEl;
+          const transition = buildSpeakerTransition({
+            name: nextName,
+            role: nextIsLast ? 'concluding' : 'speaker',
+            previousType: remainderPreviousType,
+            previousSpeaker: remainderPreviousSpeaker,
+            seed: `${transitionSeedBase}|speaker|${transitionIndex++}`,
+            avoidKey: lastTransitionKey
+          });
+          html += say(transition.text);
+          lastTransitionKey = transition.key;
+          if (nextIsLast && closingBeforeConcludingSpeaker && !closingInsertedBeforeConcludingSpeaker) {
+            html += buildClosingAfterConcludingSpeakerTransition(nextName, organist, chorister, closingNum, closingTitle, benediction, { fastSunday });
+            closingInsertedBeforeConcludingSpeaker = true;
+          }
+          remainderPreviousType = 'speaker';
+          remainderPreviousSpeaker = nextName;
+        } else if (nextEl.classList.contains('hymn')) {
+          const hnum   = (document.getElementById(`pi-hnum-${nextEl.id}`)?.value || '').trim();
+          const htitle = (document.getElementById(`pi-htitle-${nextEl.id}`)?.value || '').trim();
+          if (!hnum && !htitle) return;
+          const transition = buildIntermediateHymnTransition({
+            previousType: remainderPreviousType,
+            previousSpeaker: remainderPreviousSpeaker,
+            seed: `${transitionSeedBase}|hymn|${transitionIndex++}`,
+            avoidKey: lastTransitionKey
+          });
+          html += say(transition.text);
+          html += hymnCallout('Intermediate Hymn', hnum, htitle);
+          remainderPreviousType = 'hymn';
+          remainderPreviousSpeaker = '';
+          lastTransitionKey = transition.key;
+        } else if (nextEl.classList.contains('special')) {
+          const title = (document.getElementById(`pi-special-title-${nextEl.id}`)?.value || '').trim();
+          const by    = (document.getElementById(`pi-special-by-${nextEl.id}`)?.value || '').trim();
+          if (!title && !by) return;
+          const transition = buildSpecialMusicTransition({
+            title,
+            by,
+            previousType: remainderPreviousType,
+            previousSpeaker: remainderPreviousSpeaker,
+            seed: `${transitionSeedBase}|special|${transitionIndex++}`,
+            avoidKey: lastTransitionKey
+          });
+          html += say(transition.text);
+          remainderPreviousType = 'special';
+          remainderPreviousSpeaker = '';
+          lastTransitionKey = transition.key;
+        }
+      });
+
+      skipRemainingProgramAnnouncements = true;
+    };
 
     piDoms.forEach(el => {
+      if (skipRemainingProgramAnnouncements) return;
+
       if (el.classList.contains('break')) {
         previousProgramType = 'break';
         lastTransitionKey = '';
@@ -2476,8 +2598,14 @@ function generateScript() {
           html += say(transition.text);
           lastTransitionKey = transition.key;
         }
+        if (conductorPreannouncesRemainder && el === conductorSpeakerEl) {
+          announceRemainingProgramAfterConductor(el);
+          previousProgramType = 'speaker';
+          previousSpeakerName = name;
+          return;
+        }
         if (isLast && closingBeforeConcludingSpeaker && !closingInsertedBeforeConcludingSpeaker) {
-          html += closingBlock();
+          html += buildClosingAfterConcludingSpeakerTransition(name, organist, chorister, closingNum, closingTitle, benediction, { fastSunday });
           closingInsertedBeforeConcludingSpeaker = true;
         }
         previousProgramType = 'speaker';
