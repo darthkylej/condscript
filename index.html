@@ -2748,6 +2748,20 @@ function generateScript() {
   /* -- Render ---------------------------------------------- */
   document.getElementById('scriptTitle').textContent  = `${ward} - ${dateStr}`;
   document.getElementById('scriptContent').innerHTML  = html;
+
+  // Keep a durable local copy of the last rendered script. This survives a
+  // refresh and can be displayed even when the API cannot be reached.
+  try {
+    localStorage.setItem(SCRIPT_CACHE_KEY, JSON.stringify({
+      title: document.getElementById('scriptTitle').textContent,
+      html,
+      meetingId: currentMeetingId || null,
+      savedAt: Date.now()
+    }));
+  } catch (e) {
+    console.warn('Could not cache script for offline use:', e);
+  }
+
   document.getElementById('scriptView').classList.add('show');
   sessionStorage.setItem('condscript_view', 'script');
   if (currentMeetingId) sessionStorage.setItem('condscript_script_meeting_id', String(currentMeetingId));
@@ -2993,6 +3007,26 @@ function toggleMobileMode() {
   btn.style.color      = on ? 'white'       : '';
 }
 
+function restoreCachedScript() {
+  if (sessionStorage.getItem('condscript_view') !== 'script') return false;
+  try {
+    const cached = JSON.parse(localStorage.getItem(SCRIPT_CACHE_KEY) || 'null');
+    if (!cached?.html) return false;
+
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.querySelector('.tab-nav').style.display = '';
+    document.getElementById('scriptTitle').textContent = cached.title || 'Conductor Script';
+    document.getElementById('scriptContent').innerHTML = cached.html;
+    document.getElementById('scriptView').classList.add('show');
+    ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
+    document.getElementById('tbScript')?.classList.add('active');
+    return true;
+  } catch (e) {
+    console.warn('Could not restore cached script:', e);
+    return false;
+  }
+}
+
 function closeScript() {
   document.getElementById('scriptView').classList.remove('show');
   sessionStorage.removeItem('condscript_view');
@@ -3161,6 +3195,7 @@ function fillTestMode_DISABLED() {
 ══════════════════════════════════════════════════════════════ */
 const API_URL   = 'https://condscript-api.kylecluff.workers.dev';
 const TOKEN_KEY = 'condscript_jwt';
+const SCRIPT_CACHE_KEY = 'condscript_last_script';
 let AUTH               = { token: null, email: null, ward: null };
 let currentMeetingId   = null;   // database id of whichever program is open
 let currentMeetingDate = null;   // the date of whichever program is open
@@ -3204,6 +3239,11 @@ async function initAuth() {
 
   const me = await api('GET', '/auth/me');
   if (me.error || !me.email) {
+    // A network failure is different from an invalid login. If the user was
+    // already on Script view, keep the saved script available offline.
+    if (!navigator.onLine || (me.error && !me.status)) {
+      if (restoreCachedScript()) return;
+    }
     localStorage.removeItem(TOKEN_KEY);
     AUTH.token = null;
     showLoginScreen();
