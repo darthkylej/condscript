@@ -2749,6 +2749,7 @@ function generateScript() {
   document.getElementById('scriptTitle').textContent  = `${ward} - ${dateStr}`;
   document.getElementById('scriptContent').innerHTML  = html;
   document.getElementById('scriptView').classList.add('show');
+  sessionStorage.setItem('condscript_view', 'script');
   scriptReturnTab = activeTabName || 'builder';
   ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
   document.getElementById('tbScript')?.classList.add('active');
@@ -2993,6 +2994,7 @@ function toggleMobileMode() {
 
 function closeScript() {
   document.getElementById('scriptView').classList.remove('show');
+  sessionStorage.removeItem('condscript_view');
   switchTab(scriptReturnTab || 'builder');
 }
 
@@ -3214,6 +3216,12 @@ async function initAuth() {
 
   showApp();
   await loadLatestMeeting();
+
+  // Preserve Script view across a browser refresh. Reloading the meeting first
+  // ensures the regenerated script includes any changes saved by other users.
+  if (sessionStorage.getItem('condscript_view') === 'script') {
+    generateScript();
+  }
 }
 
 function showLoginScreen() {
