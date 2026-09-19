@@ -2750,6 +2750,7 @@ function generateScript() {
   document.getElementById('scriptContent').innerHTML  = html;
   document.getElementById('scriptView').classList.add('show');
   sessionStorage.setItem('condscript_view', 'script');
+  if (currentMeetingId) sessionStorage.setItem('condscript_script_meeting_id', String(currentMeetingId));
   scriptReturnTab = activeTabName || 'builder';
   ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
   document.getElementById('tbScript')?.classList.add('active');
@@ -2995,6 +2996,7 @@ function toggleMobileMode() {
 function closeScript() {
   document.getElementById('scriptView').classList.remove('show');
   sessionStorage.removeItem('condscript_view');
+  sessionStorage.removeItem('condscript_script_meeting_id');
   switchTab(scriptReturnTab || 'builder');
 }
 
@@ -3215,12 +3217,16 @@ async function initAuth() {
   if (!AUTH.ward) { showWardSetup(); return; }
 
   showApp();
-  await loadLatestMeeting();
 
-  // Preserve Script view across a browser refresh. Reloading the meeting first
-  // ensures the regenerated script includes any changes saved by other users.
-  if (sessionStorage.getItem('condscript_view') === 'script') {
+  // When refreshing from Script view, reopen the exact same meeting rather
+  // than switching to whichever meeting was created most recently.
+  const savedScriptMeetingId = sessionStorage.getItem('condscript_script_meeting_id');
+  if (sessionStorage.getItem('condscript_view') === 'script' && savedScriptMeetingId) {
+    await loadMeetingById(savedScriptMeetingId);
     generateScript();
+  } else {
+    await loadLatestMeeting();
+    if (sessionStorage.getItem('condscript_view') === 'script') generateScript();
   }
 }
 
