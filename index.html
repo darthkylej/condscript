@@ -226,6 +226,27 @@ select { cursor: pointer; appearance: none;
 .config-textarea { width: 100%; border: 1.5px solid var(--gray-200); border-radius: 6px; padding: 8px 10px; font-family: var(--font); font-size: .875rem; color: var(--gray-800); resize: vertical; background: white; }
 .config-textarea:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px rgba(26,58,107,.12); }
 
+/* ── Live Meeting Log ───────────────────────────────────────── */
+.meeting-log-drawer { display:none; position:fixed; right:0; top:0; bottom:0; width:min(430px,100vw); background:white; z-index:260; box-shadow:-8px 0 30px rgba(0,0,0,.18); overflow-y:auto; font-family:var(--font); }
+.meeting-log-drawer.show { display:block; }
+.meeting-log-head { position:sticky; top:0; z-index:2; background:var(--navy); color:white; padding:14px 16px; display:flex; align-items:center; gap:10px; }
+.meeting-log-head h3 { flex:1; font-size:1rem; }
+.meeting-log-body { padding:14px; }
+.log-section { border:1px solid var(--gray-200); border-radius:8px; padding:12px; margin-bottom:12px; }
+.log-section-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--gray-600); margin-bottom:9px; }
+.log-quick { display:flex; gap:7px; flex-wrap:wrap; }
+.log-speaker { border-top:1px solid var(--gray-100); padding:10px 0; }
+.log-speaker:first-of-type { border-top:0; padding-top:0; }
+.log-speaker-name { font-weight:600; font-size:.88rem; }
+.log-speaker-meta { font-size:.74rem; color:var(--gray-600); margin:3px 0 7px; }
+.log-speaker-actions { display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+.log-timer { font-variant-numeric:tabular-nums; font-weight:700; color:var(--navy); min-width:54px; }
+.log-entry { padding:7px 0; border-top:1px solid var(--gray-100); font-size:.8rem; line-height:1.35; }
+.log-entry:first-child { border-top:0; }
+.log-entry-time { color:var(--gray-600); font-size:.7rem; }
+.log-status { font-size:.74rem; color:var(--gray-600); margin-top:7px; min-height:1em; }
+@media print { .meeting-log-drawer, #meetingLogBtn { display:none !important; } }
+
 /* ── Misc ───────────────────────────────────────────────────── */
 .generate-section { text-align: center; padding: 24px 0; }
 .generate-section p { font-size: .825rem; color: var(--gray-600); margin-top: 8px; }
@@ -1105,9 +1126,48 @@ select { cursor: pointer; appearance: none;
     <button class="btn btn-secondary btn-sm" onclick="closeScript()">← Back</button>
     <h2 id="scriptTitle">Conductor Script</h2>
     <button class="btn btn-secondary btn-sm" id="mobileToggleBtn" onclick="toggleMobileMode()" title="Mobile-friendly view">📱 Mobile</button>
+    <button class="btn btn-secondary btn-sm" id="meetingLogBtn" onclick="openMeetingLog()">📝 Log</button>
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print</button>
   </div>
   <div class="script-page" id="scriptContent"></div>
+</div>
+
+<div class="meeting-log-drawer" id="meetingLogDrawer">
+  <div class="meeting-log-head">
+    <h3>Meeting Log</h3>
+    <button class="btn btn-secondary btn-sm" onclick="closeMeetingLog()">Close</button>
+  </div>
+  <div class="meeting-log-body">
+    <div class="log-section">
+      <div class="log-section-title">Quick timestamps</div>
+      <div class="log-quick">
+        <button class="btn btn-secondary btn-sm" onclick="addQuickTimestamp('Sacrament ended')">Sacrament ended</button>
+        <button class="btn btn-secondary btn-sm" onclick="addQuickTimestamp('Testimonies began')">Testimonies began</button>
+        <button class="btn btn-secondary btn-sm" onclick="addQuickTimestamp('Meeting ended')">Meeting ended</button>
+      </div>
+    </div>
+    <div class="log-section" id="liveSpeakerSection">
+      <div class="log-section-title">Talks</div>
+      <div id="liveSpeakerControls"></div>
+    </div>
+    <div class="log-section" id="testimonyLogSection">
+      <div class="log-section-title">Testimony</div>
+      <div style="display:flex;gap:7px">
+        <input id="testimonyLogName" type="text" placeholder="Name" onkeydown="if(event.key==='Enter') addTestimonyLog()">
+        <button class="btn btn-primary btn-sm" onclick="addTestimonyLog()">Add</button>
+      </div>
+    </div>
+    <div class="log-section">
+      <div class="log-section-title">General note</div>
+      <textarea id="meetingLogNote" placeholder="What happened?" style="min-height:64px"></textarea>
+      <button class="btn btn-primary btn-sm" style="margin-top:7px" onclick="addGeneralMeetingNote()">Add note</button>
+    </div>
+    <div class="log-section">
+      <div class="log-section-title">Recent log</div>
+      <div id="meetingLogEntries"><div class="text-muted">No entries yet.</div></div>
+      <div class="log-status" id="meetingLogStatus"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════ VISITOR MODAL ═══════════ -->
@@ -2763,6 +2823,7 @@ function generateScript() {
   }
 
   document.getElementById('scriptView').classList.add('show');
+  startMeetingLogSync();
   sessionStorage.setItem('condscript_view', 'script');
   if (currentMeetingId) sessionStorage.setItem('condscript_script_meeting_id', String(currentMeetingId));
   scriptReturnTab = activeTabName || 'builder';
@@ -2808,6 +2869,126 @@ function hymnSection(phraseKey, calloutLabel, num, title, extraTokens = {}) {
   out += hymnCallout(calloutLabel, num, title);
   if (parts.length > 1 && parts[1].trim()) out += say(parts[1].trim());
   return out;
+}
+
+/* ── Live Meeting Log ─────────────────────────────────────────── */
+let meetingLogState = { entries: [], talk_segments: [], server_now: null };
+let meetingLogPollTimer = null;
+let meetingLogClockTimer = null;
+
+function escAttr(value) { return escHtml(String(value || '')).replace(/'/g, '&#39;'); }
+function speakerLogKey(name, index) {
+  return normalizePersonNameForCompare(name).replace(/\s+/g,'-') + ':' + index;
+}
+function getLiveSpeakers() {
+  return [...document.querySelectorAll('.program-item.speaker')]
+    .map(el => (document.getElementById(`pi-name-${el.id}`)?.value || '').trim())
+    .filter(Boolean)
+    .map((name,index) => ({ name, key:speakerLogKey(name,index) }));
+}
+function openMeetingLog() {
+  document.getElementById('meetingLogDrawer')?.classList.add('show');
+  renderMeetingLog();
+  refreshMeetingLog();
+}
+function closeMeetingLog() { document.getElementById('meetingLogDrawer')?.classList.remove('show'); }
+function setMeetingLogStatus(text) { const el=document.getElementById('meetingLogStatus'); if(el) el.textContent=text||''; }
+
+async function refreshMeetingLog() {
+  if (!currentMeetingId || !AUTH.token || !navigator.onLine) return;
+  const r = await api('GET', `/meetings/id/${currentMeetingId}/log`);
+  if (!r.error) { meetingLogState=r; renderMeetingLog(); }
+}
+function startMeetingLogSync() {
+  stopMeetingLogSync();
+  if (!currentMeetingId || !AUTH.token) return;
+  refreshMeetingLog();
+  meetingLogPollTimer=setInterval(refreshMeetingLog,3000);
+  meetingLogClockTimer=setInterval(renderMeetingLogTimers,1000);
+}
+function stopMeetingLogSync() {
+  if(meetingLogPollTimer)clearInterval(meetingLogPollTimer);
+  if(meetingLogClockTimer)clearInterval(meetingLogClockTimer);
+  meetingLogPollTimer=null; meetingLogClockTimer=null;
+}
+function segmentsForSpeaker(key) { return (meetingLogState.talk_segments||[]).filter(x=>x.speaker_key===key); }
+function totalTalkMs(segments) {
+  const now=Date.now();
+  return segments.reduce((sum,x)=>sum+Math.max(0,(x.ended_at?new Date(x.ended_at).getTime():now)-new Date(x.started_at).getTime()),0);
+}
+function formatElapsed(ms) {
+  const sec=Math.floor(ms/1000), m=Math.floor(sec/60), s=sec%60;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+function renderMeetingLogTimers() {
+  getLiveSpeakers().forEach(sp=>{
+    const el=document.querySelector(`[data-talk-timer="${CSS.escape(sp.key)}"]`);
+    if(el) el.textContent=formatElapsed(totalTalkMs(segmentsForSpeaker(sp.key)));
+  });
+}
+function renderMeetingLog() {
+  const speakers=getLiveSpeakers();
+  const holder=document.getElementById('liveSpeakerControls');
+  if(holder) holder.innerHTML=speakers.length?speakers.map(sp=>{
+    const segs=segmentsForSpeaker(sp.key), active=segs.find(x=>!x.ended_at), hasHistory=segs.length>0;
+    const action=active?'End':(hasHistory?'Resume':'Start');
+    const cls=active?'btn-danger':'btn-primary';
+    return `<div class="log-speaker">
+      <div class="log-speaker-name">${escHtml(sp.name)}</div>
+      <div class="log-speaker-meta">Speaking time: <span class="log-timer" data-talk-timer="${escHtml(sp.key)}">${formatElapsed(totalTalkMs(segs))}</span></div>
+      <div class="log-speaker-actions">
+        <button class="btn ${cls} btn-sm" onclick="handleTalkAction('${escAttr(sp.key)}','${escAttr(sp.name)}','${action}')">${action}</button>
+        <button class="btn btn-secondary btn-sm" onclick="addSpeakerTopic('${escAttr(sp.key)}','${escAttr(sp.name)}')">Topic</button>
+      </div>
+    </div>`;
+  }).join(''):'<div class="text-muted">No speakers are entered in the program.</div>';
+  const testimony=document.getElementById('testimonyLogSection');
+  if(testimony) testimony.style.display=document.getElementById('fastSunday')?.checked?'':'none';
+  const entries=document.getElementById('meetingLogEntries');
+  if(entries){
+    const combined=[
+      ...(meetingLogState.entries||[]).map(x=>({time:x.occurred_at,html:`<strong>${escHtml(x.label||({testimony:'Testimony',note:'Note',topic:'Topic',timestamp:'Time'}[x.entry_type]||'Log'))}</strong>${x.value?' — '+escHtml(x.value):''}`})),
+      ...(meetingLogState.talk_segments||[]).flatMap(x=>[
+        {time:x.started_at,html:`<strong>${escHtml(x.speaker_name)}</strong> ${x.ended_at?'started':'is speaking'}`},
+        ...(x.ended_at?[{time:x.ended_at,html:`<strong>${escHtml(x.speaker_name)}</strong> ended`}]:[])
+      ])
+    ].sort((a,b)=>new Date(b.time)-new Date(a.time)).slice(0,30);
+    entries.innerHTML=combined.length?combined.map(x=>`<div class="log-entry"><div class="log-entry-time">${new Date(x.time).toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'})}</div>${x.html}</div>`).join(''):'<div class="text-muted">No entries yet.</div>';
+  }
+  renderMeetingLogTimers();
+}
+async function handleTalkAction(key,name,action) {
+  if(!currentMeetingId)return;
+  if(action==='Resume' && !confirm(`Resume ${name}'s talk? The talk timer will continue accumulating speaking time.`)) return;
+  setMeetingLogStatus(action==='End'?'Ending talk…':action==='Resume'?'Resuming talk…':'Starting talk…');
+  const endpoint=action==='End'?'end':'start';
+  const body=endpoint==='end'?{speaker_key:key}:{speaker_key:key,speaker_name:name};
+  const r=await api('POST',`/meetings/id/${currentMeetingId}/talks/${endpoint}`,body);
+  if(r.error){setMeetingLogStatus(r.error);return;}
+  meetingLogState=r; renderMeetingLog();
+  setMeetingLogStatus(r.already_running?'Already started by another user.':r.already_ended?'Already ended by another user.':'Saved.');
+}
+async function addMeetingLogEntry(entry_type,label,value='') {
+  if(!currentMeetingId)return;
+  const r=await api('POST',`/meetings/id/${currentMeetingId}/log`,{entry_type,label,value});
+  if(r.error){setMeetingLogStatus(r.error);return null;}
+  meetingLogState=r; renderMeetingLog();
+  if(r.duplicate)setMeetingLogStatus(`${r.existing?.value||value} was just recorded by another user.`);
+  else setMeetingLogStatus('Saved.');
+  return r;
+}
+async function addQuickTimestamp(label){ await addMeetingLogEntry('timestamp',label,''); }
+async function addTestimonyLog(){
+  const input=document.getElementById('testimonyLogName'), name=(input?.value||'').trim(); if(!name)return;
+  const r=await addMeetingLogEntry('testimony','Testimony',name); if(r&&input)input.value='';
+}
+async function addGeneralMeetingNote(){
+  const input=document.getElementById('meetingLogNote'), value=(input?.value||'').trim(); if(!value)return;
+  const r=await addMeetingLogEntry('note','Note',value); if(r&&input)input.value='';
+}
+async function addSpeakerTopic(key,name){
+  const topic=prompt(`Actual topic for ${name}:`); if(topic===null||!topic.trim())return;
+  await addMeetingLogEntry('topic',`Topic — ${name}`,topic.trim());
 }
 
 /* ── Utilities ───────────────────────────────────────────────── */
@@ -3028,6 +3209,8 @@ function restoreCachedScript() {
 }
 
 function closeScript() {
+  stopMeetingLogSync();
+  closeMeetingLog();
   document.getElementById('scriptView').classList.remove('show');
   sessionStorage.removeItem('condscript_view');
   sessionStorage.removeItem('condscript_script_meeting_id');
