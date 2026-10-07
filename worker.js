@@ -300,6 +300,65 @@ async function upsertComponent(env, meetingId, userId, comp) {
   );
 }
 
+// ── Live meeting log ───────────────────────────────────────────
+function normalizeLogName(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+
+async function ensureMeetingLogSchema(env) {
+  await query(env, `CREATE TABLE IF NOT EXISTS meeting_log_entries (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), meeting_id uuid NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    entry_type text NOT NULL CHECK (entry_type IN ('note','timestamp','testimony','topic')), label text, value text,
+    normalized_value text, occurred_at timestamptz NOT NULL DEFAULT NOW(), created_by uuid REFERENCES users(id),
+    created_at timestamptz NOT NULL DEFAULT NOW())`);
+  await query(env, `CREATE INDEX IF NOT EXISTS idx_meeting_log_entries_meeting_time ON meeting_log_entries (meeting_id, occurred_at, created_at)`);
+  await query(env, `CREATE TABLE IF NOT EXISTS meeting_talk_segments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), meeting_id uuid NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    speaker_key text NOT NULL, speaker_name text NOT NULL, started_at timestamptz NOT NULL DEFAULT NOW(), ended_at timestamptz,
+    started_by uuid REFERENCES users(id), ended_by uuid REFERENCES users(id), created_at timestamptz NOT NULL DEFAULT NOW(),
+    CHECK (ended_at IS NULL OR ended_at >= started_at))`);
+  await query(env, `CREATE INDEX IF NOT EXISTS idx_meeting_talk_segments_meeting ON meeting_talk_segments (meeting_id, speaker_key, started_at)`);
+  await query(env, `CREATE UNIQUE INDEX IF NOT EXISTS uq_meeting_talk_one_active_segment ON meeting_talk_segments (meeting_id, speaker_key) WHERE ended_at IS NULL`);
+}
+async function getMeetingLogState(env, meetingId) {
+  const entries = await query(env, `SELECT e.id,e.entry_type,e.label,e.value,e.occurred_at,e.created_at,u.email created_by_email FROM meeting_log_entries e LEFT JOIN users u ON u.id=e.created_by WHERE e.meeting_id=$1 ORDER BY e.occurred_at,e.created_at`, [meetingId]);
+  const segments = await query(env, `SELECT s.id,s.speaker_key,s.speaker_name,s.started_at,s.ended_at,su.email started_by_email,eu.email ended_by_email FROM meeting_talk_segments s LEFT JOIN users su ON su.id=s.started_by LEFT JOIN users eu ON eu.id=s.ended_by WHERE s.meeting_id=$1 ORDER BY s.started_at`, [meetingId]);
+  return { entries: entries.rows||[], talk_segments: segments.rows||[], server_now:new Date().toISOString() };
+}
+async function getAuthorizedMeeting(request, env, meetingId) {
+  const session=await getSession(request,env); if(!session) return {error:err('Unauthorized',401)};
+  const ward=await getUserWard(env,session.user_id); if(!ward) return {error:err('Not in a ward',403)};
+  const id=await getMeetingIdForWard(env,ward.id,meetingId); if(!id) return {error:err('Meeting not found',404)};
+  return {session,ward,id};
+}
+async function handleGetMeetingLog(request,env,meetingId) {
+  const a=await getAuthorizedMeeting(request,env,meetingId); if(a.error)return a.error; await ensureMeetingLogSchema(env); return json(await getMeetingLogState(env,a.id));
+}
+async function handleAddMeetingLogEntry(request,env,meetingId) {
+  const a=await getAuthorizedMeeting(request,env,meetingId); if(a.error)return a.error; await ensureMeetingLogSchema(env);
+  const b=await request.json(), type=String(b.entry_type||'').trim(), label=String(b.label||'').trim().slice(0,200)||null, value=String(b.value||'').trim().slice(0,4000);
+  if(!['note','timestamp','testimony','topic'].includes(type)) return err('Invalid entry_type');
+  if(!value && type!=='timestamp') return err('A value is required');
+  const normalized=type==='testimony'?normalizeLogName(value):null;
+  if(type==='testimony'&&normalized){
+    const d=await query(env,`SELECT e.id,e.value,e.occurred_at,u.email created_by_email FROM meeting_log_entries e LEFT JOIN users u ON u.id=e.created_by WHERE e.meeting_id=$1 AND e.entry_type='testimony' AND e.normalized_value=$2 AND e.occurred_at>NOW()-INTERVAL '60 seconds' ORDER BY e.occurred_at DESC LIMIT 1`,[a.id,normalized]);
+    if(d.rows?.length)return json({ok:true,duplicate:true,existing:d.rows[0],...(await getMeetingLogState(env,a.id))});
+  }
+  await query(env,`INSERT INTO meeting_log_entries(meeting_id,entry_type,label,value,normalized_value,created_by) VALUES($1,$2,$3,$4,$5,$6)`,[a.id,type,label,value||null,normalized,a.session.user_id]);
+  return json({ok:true,...(await getMeetingLogState(env,a.id))},201);
+}
+async function handleStartTalk(request,env,meetingId) {
+  const a=await getAuthorizedMeeting(request,env,meetingId); if(a.error)return a.error; await ensureMeetingLogSchema(env);
+  const b=await request.json(), name=String(b.speaker_name||'').trim().slice(0,300), key=String(b.speaker_key||normalizeLogName(name)).trim().slice(0,300);
+  if(!name||!key)return err('speaker_name is required');
+  const r=await query(env,`INSERT INTO meeting_talk_segments(meeting_id,speaker_key,speaker_name,started_by) VALUES($1,$2,$3,$4) ON CONFLICT (meeting_id,speaker_key) WHERE ended_at IS NULL DO NOTHING RETURNING id,started_at`,[a.id,key,name,a.session.user_id]);
+  return json({ok:true,already_running:!r.rows?.length,...(await getMeetingLogState(env,a.id))});
+}
+async function handleEndTalk(request,env,meetingId) {
+  const a=await getAuthorizedMeeting(request,env,meetingId); if(a.error)return a.error; await ensureMeetingLogSchema(env);
+  const b=await request.json(), key=String(b.speaker_key||'').trim().slice(0,300); if(!key)return err('speaker_key is required');
+  const r=await query(env,`UPDATE meeting_talk_segments SET ended_at=NOW(),ended_by=$3 WHERE id=(SELECT id FROM meeting_talk_segments WHERE meeting_id=$1 AND speaker_key=$2 AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1) AND ended_at IS NULL RETURNING id,ended_at`,[a.id,key,a.session.user_id]);
+  return json({ok:true,already_ended:!r.rows?.length,...(await getMeetingLogState(env,a.id))});
+}
+
 // ── Meeting handlers ───────────────────────────────────────────
 async function handleListMeetings(request, env) {
   const session = await getSession(request, env);
@@ -687,6 +746,14 @@ export default {
 
       const idReplaceMatch = path.match(/^\/meetings\/id\/([0-9a-fA-F-]{36})\/components\/replace-type$/);
       if (idReplaceMatch && method === 'POST') return await handleReplaceTypeById(request, env, idReplaceMatch[1]);
+
+      const idLogMatch = path.match(/^\/meetings\/id\/([0-9a-fA-F-]{36})\/log$/);
+      if (idLogMatch && method === 'GET') return await handleGetMeetingLog(request, env, idLogMatch[1]);
+      if (idLogMatch && method === 'POST') return await handleAddMeetingLogEntry(request, env, idLogMatch[1]);
+      const idTalkStartMatch = path.match(/^\/meetings\/id\/([0-9a-fA-F-]{36})\/talks\/start$/);
+      if (idTalkStartMatch && method === 'POST') return await handleStartTalk(request, env, idTalkStartMatch[1]);
+      const idTalkEndMatch = path.match(/^\/meetings\/id\/([0-9a-fA-F-]{36})\/talks\/end$/);
+      if (idTalkEndMatch && method === 'POST') return await handleEndTalk(request, env, idTalkEndMatch[1]);
 
       const dateMatch = path.match(/^\/meetings\/(\d{4}-\d{2}-\d{2})$/);
       if (dateMatch && method === 'GET')   return await handleGetMeeting(request, env, dateMatch[1]);
