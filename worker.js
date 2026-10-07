@@ -349,7 +349,7 @@ async function handleAddMeetingLogEntry(request,env,meetingId) {
 async function handleUpdateMeetingLogEntry(request,env,meetingId,entryId) {
   const a=await getAuthorizedMeeting(request,env,meetingId); if(a.error)return a.error; await ensureMeetingLogSchema(env);
   const b=await request.json(), notes=String(b.notes||'').trim().slice(0,4000);
-  const r=await query(env,`UPDATE meeting_log_entries SET notes=$4 WHERE id=$2 AND meeting_id=$1 AND entry_type='testimony' RETURNING id`,[a.id,entryId,a.session.user_id,notes||null]);
+  const r=await query(env,`UPDATE meeting_log_entries SET notes=$3 WHERE id=$2 AND meeting_id=$1 AND entry_type='testimony' RETURNING id`,[a.id,entryId,notes||null]);
   if(!r.rows?.length)return err('Testimony entry not found',404);
   return json({ok:true,...(await getMeetingLogState(env,a.id))});
 }
