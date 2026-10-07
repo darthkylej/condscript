@@ -1120,7 +1120,7 @@ select { cursor: pointer; appearance: none;
       <div class="log-section-title">Quick timestamps</div>
       <div class="log-quick">
         <button class="btn btn-secondary btn-sm" onclick="addQuickTimestamp('Sacrament ended')">Sacrament ended</button>
-        <button class="btn btn-secondary btn-sm" onclick="addQuickTimestamp('Testimonies began')">Testimonies began</button>
+        <button class="btn btn-secondary btn-sm" id="testimoniesBeganBtn" onclick="addQuickTimestamp('Testimonies began')" style="display:none">Testimonies began</button>
         <button class="btn btn-secondary btn-sm" onclick="addQuickTimestamp('Meeting ended')">Meeting ended</button>
       </div>
     </div>
@@ -2920,8 +2920,11 @@ function renderMeetingLog() {
       </div>
     </div>`;
   }).join(''):'<div class="text-muted">No speakers are entered in the program.</div>';
+  const isFastSunday=!!document.getElementById('fastSunday')?.checked;
   const testimony=document.getElementById('testimonyLogSection');
-  if(testimony) testimony.style.display=document.getElementById('fastSunday')?.checked?'':'none';
+  if(testimony) testimony.style.display=isFastSunday?'':'none';
+  const testimoniesBeganBtn=document.getElementById('testimoniesBeganBtn');
+  if(testimoniesBeganBtn) testimoniesBeganBtn.style.display=isFastSunday?'':'none';
   const entries=document.getElementById('meetingLogEntries');
   if(entries){
     const combined=[
