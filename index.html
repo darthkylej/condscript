@@ -352,27 +352,6 @@ select { cursor: pointer; appearance: none;
   @page { margin: 1.5cm; size: letter; }
 }
 
-/* ── Mobile Script Mode ───────────────────────────────────────── */
-#scriptView.mobile-mode .script-page {
-  max-width: 100%; padding: 14px 14px 60px;
-}
-#scriptView.mobile-mode .script-meeting-header {
-  padding: 12px 14px; margin-bottom: 20px;
-}
-#scriptView.mobile-mode .script-meeting-header .ward-name { font-size: 1.15rem; }
-#scriptView.mobile-mode .script-meeting-header .meta-row  { font-size: .78rem; gap: 10px; }
-#scriptView.mobile-mode .script-say {
-  font-size: 1.3rem; line-height: 2.05; margin-bottom: 22px;
-}
-#scriptView.mobile-mode .script-sec-head {
-  font-size: .72rem; margin: 30px 0 12px;
-}
-#scriptView.mobile-mode .script-hymn-callout {
-  padding: 12px 14px; margin-bottom: 18px;
-}
-#scriptView.mobile-mode .script-hymn-callout .hc-text { font-size: 1.1rem; }
-#scriptView.mobile-mode .script-sacrament-break { padding: 18px 14px; }
-#scriptView.mobile-mode .pause-mark { font-size: .7rem; padding: 2px 9px; }
 @media (max-width: 600px) {
   html { font-size: 14px; }
   .app-header {
@@ -1125,7 +1104,6 @@ select { cursor: pointer; appearance: none;
   <div class="script-toolbar">
     <button class="btn btn-secondary btn-sm" onclick="closeScript()">← Back</button>
     <h2 id="scriptTitle">Conductor Script</h2>
-    <button class="btn btn-secondary btn-sm" id="mobileToggleBtn" onclick="toggleMobileMode()" title="Mobile-friendly view">📱 Mobile</button>
     <button class="btn btn-secondary btn-sm" id="meetingLogBtn" onclick="openMeetingLog()">📝 Log</button>
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print</button>
   </div>
@@ -3178,14 +3156,6 @@ function formatDate(ds) {
   if (!ds) return '___';
   const [y,m,d] = ds.split('-');
   return new Date(+y, +m-1, +d).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-}
-
-function toggleMobileMode() {
-  const view = document.getElementById('scriptView');
-  const btn  = document.getElementById('mobileToggleBtn');
-  const on   = view.classList.toggle('mobile-mode');
-  btn.style.background = on ? 'var(--gold)' : '';
-  btn.style.color      = on ? 'white'       : '';
 }
 
 function restoreCachedScript() {
