@@ -2876,6 +2876,7 @@ let meetingLogState = { entries: [], talk_segments: [], server_now: null };
 let meetingLogPollTimer = null;
 let meetingLogClockTimer = null;
 
+function escAttr(value) { return escHtml(String(value || '')).replace(/'/g, '&#39;'); }
 function speakerLogKey(name, index) {
   return normalizePersonNameForCompare(name).replace(/\s+/g,'-') + ':' + index;
 }
