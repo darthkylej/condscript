@@ -2929,8 +2929,8 @@ function renderMeetingLog() {
   if(entries){
     const combined=[
       ...(meetingLogState.entries||[]).map(x=>({time:x.occurred_at,html:x.entry_type==='testimony'
-        ? `<strong>Testimony — ${escHtml(x.value||'')}</strong>${x.notes?`<div style="margin-top:3px">${escHtml(x.notes)}</div>`:''}<button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="editTestimonyNote('${escAttr(x.id)}')">${x.notes?'Edit note':'Add note'}</button>`
-        : `<strong>${escHtml(x.label||({note:'Note',topic:'Topic',timestamp:'Time'}[x.entry_type]||'Log'))}</strong>${x.value?' — '+escHtml(x.value):''}`})),
+        ? `<strong>Testimony — ${escHtml(x.value||'')}</strong>${x.notes?`<div style="margin-top:3px">${escHtml(x.notes)}</div>`:''}<div style="display:flex;gap:6px;margin-top:6px"><button class="btn btn-secondary btn-sm" onclick="editTestimonyNote('${escAttr(x.id)}')">${x.notes?'Edit note':'Add note'}</button><button class="btn btn-secondary btn-sm" onclick="deleteMeetingLogEntry('${escAttr(x.id)}')">Delete</button></div>`
+        : `<strong>${escHtml(x.label||({note:'Note',topic:'Topic',timestamp:'Time'}[x.entry_type]||'Log'))}</strong>${x.value?' — '+escHtml(x.value):''}<div style="margin-top:6px"><button class="btn btn-secondary btn-sm" onclick="deleteMeetingLogEntry('${escAttr(x.id)}')">Delete</button></div>`})),
       ...(meetingLogState.talk_segments||[]).flatMap(x=>[
         {time:x.started_at,html:`<strong>${escHtml(x.speaker_name)}</strong> ${x.ended_at?'started':'is speaking'}`},
         ...(x.ended_at?[{time:x.ended_at,html:`<strong>${escHtml(x.speaker_name)}</strong> ended`}]:[])
@@ -2964,6 +2964,14 @@ async function addQuickTimestamp(label){ await addMeetingLogEntry('timestamp',la
 async function addTestimonyLog(){
   const input=document.getElementById('testimonyLogName'), name=(input?.value||'').trim(); if(!name)return;
   const r=await addMeetingLogEntry('testimony','Testimony',name); if(r&&input)input.value='';
+}
+async function deleteMeetingLogEntry(entryId){
+  const entry=(meetingLogState.entries||[]).find(x=>x.id===entryId); if(!entry)return;
+  const description=entry.entry_type==='testimony'?`testimony entry for ${entry.value||'this person'}`:(entry.label||entry.entry_type||'log entry');
+  if(!confirm(`Delete this ${description}? This cannot be undone.`))return;
+  const r=await api('DELETE',`/meetings/id/${currentMeetingId}/log/${entryId}`);
+  if(r.error){setMeetingLogStatus(r.error);return;}
+  meetingLogState=r; renderMeetingLog(); setMeetingLogStatus('Log entry deleted.');
 }
 async function editTestimonyNote(entryId){
   const entry=(meetingLogState.entries||[]).find(x=>x.id===entryId); if(!entry)return;
