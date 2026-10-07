@@ -353,6 +353,12 @@ async function handleUpdateMeetingLogEntry(request,env,meetingId,entryId) {
   if(!r.rows?.length)return err('Testimony entry not found',404);
   return json({ok:true,...(await getMeetingLogState(env,a.id))});
 }
+async function handleDeleteMeetingLogEntry(request,env,meetingId,entryId) {
+  const a=await getAuthorizedMeeting(request,env,meetingId); if(a.error)return a.error; await ensureMeetingLogSchema(env);
+  const r=await query(env,`DELETE FROM meeting_log_entries WHERE id=$2 AND meeting_id=$1 RETURNING id`,[a.id,entryId]);
+  if(!r.rows?.length)return err('Log entry not found',404);
+  return json({ok:true,...(await getMeetingLogState(env,a.id))});
+}
 async function handleStartTalk(request,env,meetingId) {
   const a=await getAuthorizedMeeting(request,env,meetingId); if(a.error)return a.error; await ensureMeetingLogSchema(env);
   const b=await request.json(), name=String(b.speaker_name||'').trim().slice(0,300), key=String(b.speaker_key||normalizeLogName(name)).trim().slice(0,300);
@@ -760,6 +766,7 @@ export default {
       if (idLogMatch && method === 'POST') return await handleAddMeetingLogEntry(request, env, idLogMatch[1]);
       const idLogEntryMatch = path.match(/^\/meetings\/id\/([0-9a-fA-F-]{36})\/log\/([0-9a-fA-F-]{36})$/);
       if (idLogEntryMatch && method === 'PATCH') return await handleUpdateMeetingLogEntry(request, env, idLogEntryMatch[1], idLogEntryMatch[2]);
+      if (idLogEntryMatch && method === 'DELETE') return await handleDeleteMeetingLogEntry(request, env, idLogEntryMatch[1], idLogEntryMatch[2]);
       const idTalkStartMatch = path.match(/^\/meetings\/id\/([0-9a-fA-F-]{36})\/talks\/start$/);
       if (idTalkStartMatch && method === 'POST') return await handleStartTalk(request, env, idTalkStartMatch[1]);
       const idTalkEndMatch = path.match(/^\/meetings\/id\/([0-9a-fA-F-]{36})\/talks\/end$/);
