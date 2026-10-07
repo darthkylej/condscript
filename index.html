@@ -2928,7 +2928,9 @@ function renderMeetingLog() {
   const entries=document.getElementById('meetingLogEntries');
   if(entries){
     const combined=[
-      ...(meetingLogState.entries||[]).map(x=>({time:x.occurred_at,html:`<strong>${escHtml(x.label||({testimony:'Testimony',note:'Note',topic:'Topic',timestamp:'Time'}[x.entry_type]||'Log'))}</strong>${x.value?' — '+escHtml(x.value):''}`})),
+      ...(meetingLogState.entries||[]).map(x=>({time:x.occurred_at,html:x.entry_type==='testimony'
+        ? `<strong>Testimony — ${escHtml(x.value||'')}</strong>${x.notes?`<div style="margin-top:3px">${escHtml(x.notes)}</div>`:''}<button class="btn btn-secondary btn-sm" style="margin-top:6px" onclick="editTestimonyNote('${escAttr(x.id)}')">${x.notes?'Edit note':'Add note'}</button>`
+        : `<strong>${escHtml(x.label||({note:'Note',topic:'Topic',timestamp:'Time'}[x.entry_type]||'Log'))}</strong>${x.value?' — '+escHtml(x.value):''}`})),
       ...(meetingLogState.talk_segments||[]).flatMap(x=>[
         {time:x.started_at,html:`<strong>${escHtml(x.speaker_name)}</strong> ${x.ended_at?'started':'is speaking'}`},
         ...(x.ended_at?[{time:x.ended_at,html:`<strong>${escHtml(x.speaker_name)}</strong> ended`}]:[])
@@ -2962,6 +2964,14 @@ async function addQuickTimestamp(label){ await addMeetingLogEntry('timestamp',la
 async function addTestimonyLog(){
   const input=document.getElementById('testimonyLogName'), name=(input?.value||'').trim(); if(!name)return;
   const r=await addMeetingLogEntry('testimony','Testimony',name); if(r&&input)input.value='';
+}
+async function editTestimonyNote(entryId){
+  const entry=(meetingLogState.entries||[]).find(x=>x.id===entryId); if(!entry)return;
+  const notes=prompt(`Notes for ${entry.value || 'this testimony'}:`,entry.notes||'');
+  if(notes===null)return;
+  const r=await api('PATCH',`/meetings/id/${currentMeetingId}/log/${entryId}`,{notes});
+  if(r.error){setMeetingLogStatus(r.error);return;}
+  meetingLogState=r; renderMeetingLog(); setMeetingLogStatus('Testimony note saved.');
 }
 async function addGeneralMeetingNote(){
   const input=document.getElementById('meetingLogNote'), value=(input?.value||'').trim(); if(!value)return;
