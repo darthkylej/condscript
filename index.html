@@ -591,8 +591,8 @@ select { cursor: pointer; appearance: none;
 
 <!-- ═══════════ TAB NAV ═══════════ -->
 <nav class="tab-nav">
-  <button class="tab-btn active" id="tbBuilder" onclick="switchTab('builder')">📋 Builder</button>
-  <button class="tab-btn" id="tbHistory" onclick="switchTab('history')">📅 Programs</button>
+  <button class="tab-btn" id="tbBuilder" onclick="switchTab('builder')">📋 Builder</button>
+  <button class="tab-btn active" id="tbHistory" onclick="switchTab('history')">📅 Programs</button>
   <button class="tab-btn" id="tbPeopleHistory" onclick="switchTab('peopleHistory')">🕘 History</button>
   <button class="tab-btn" id="tbScript" onclick="generateScript()">📄 Script</button>
 </nav>
@@ -1102,7 +1102,8 @@ select { cursor: pointer; appearance: none;
 
 <div id="scriptView">
   <div class="script-toolbar">
-    <button class="btn btn-secondary btn-sm" onclick="closeScript()">← Back</button>
+    <button class="btn btn-secondary btn-sm" onclick="leaveScriptTo('history')">📅 Programs</button>
+    <button class="btn btn-secondary btn-sm" onclick="leaveScriptTo('builder')">📋 Builder</button>
     <h2 id="scriptTitle">Conductor Script</h2>
     <button class="btn btn-secondary btn-sm" id="meetingLogBtn" onclick="openMeetingLog()">📝 Log</button>
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print</button>
@@ -1569,8 +1570,8 @@ let programItems  = [];
 let announcements = [];
 let activeBiz     = {};
 let nextDomId     = Date.now();
-let activeTabName = 'builder';
-let scriptReturnTab = 'builder';
+let activeTabName = 'history';
+let scriptReturnTab = 'history';
 
 function newDomId(prefix = '') {
   nextDomId += 1;
@@ -3199,13 +3200,17 @@ function restoreCachedScript() {
   }
 }
 
-function closeScript() {
+function leaveScriptTo(tab) {
   stopMeetingLogSync();
   closeMeetingLog();
   document.getElementById('scriptView').classList.remove('show');
   sessionStorage.removeItem('condscript_view');
   sessionStorage.removeItem('condscript_script_meeting_id');
-  switchTab(scriptReturnTab || 'builder');
+  switchTab(tab);
+}
+
+function closeScript() {
+  leaveScriptTo(scriptReturnTab || 'history');
 }
 
 /* ── [test mode removed] ─────────────────────────────────────── */
@@ -3439,8 +3444,7 @@ async function initAuth() {
     await loadMeetingById(savedScriptMeetingId);
     generateScript();
   } else {
-    await loadLatestMeeting();
-    if (sessionStorage.getItem('condscript_view') === 'script') generateScript();
+    switchTab('history');
   }
 }
 
@@ -3453,7 +3457,7 @@ function showApp() {
   document.querySelector('.tab-nav').style.display      = '';
   applyWardIdentity({ force: true });
   updateAuthHeader();
-  switchTab('builder');
+  switchTab('history');
 }
 
 function showWardSetup() {
@@ -4112,7 +4116,7 @@ async function loadHistoryTab() {
         <div class="history-item-date">${escHtml(fmt)}${isCurrent?' <span style="font-size:.7rem;background:var(--navy);color:white;padding:1px 7px;border-radius:8px;margin-left:6px;vertical-align:middle">OPEN</span>':''}</div>
         <div class="history-item-meta">${escHtml(meta)}</div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteMeeting('${m.id}', decodeURIComponent('${encodedLabel}'))">Delete</button></div>
+      <div style="display:flex;gap:8px;align-items:center"><button class="btn btn-danger" style="padding:2px 6px;font-size:.68rem" onclick="event.stopPropagation();deleteMeeting('${m.id}', decodeURIComponent('${encodedLabel}'))">Delete</button></div>
     </div>`;
   }).join('');
 }
