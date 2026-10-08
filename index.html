@@ -2812,8 +2812,10 @@ function generateScript() {
   document.getElementById('peopleHistoryTab').style.display='none';
   document.getElementById('scriptView').classList.add('show');
   startMeetingLogSync();
-  sessionStorage.setItem('condscript_view', 'script');
-  if (currentMeetingId) sessionStorage.setItem('condscript_script_meeting_id', String(currentMeetingId));
+  if (currentMeetingId) {
+    sessionStorage.setItem('condscript_script_meeting_id', String(currentMeetingId));
+    sessionStorage.setItem('condscript_view', 'script');
+  }
   scriptReturnTab = activeTabName || 'builder';
   ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
   document.getElementById('tbScript')?.classList.add('active');
@@ -3452,15 +3454,18 @@ async function initAuth() {
 
   // When refreshing from Script view, reopen the exact same meeting rather
   // than switching to whichever meeting was created most recently.
+  const savedView = sessionStorage.getItem('condscript_view');
   const savedScriptMeetingId = sessionStorage.getItem('condscript_script_meeting_id');
-  if (sessionStorage.getItem('condscript_view') === 'script' && savedScriptMeetingId) {
+  if (savedScriptMeetingId && savedView === 'script') {
     await loadMeetingById(savedScriptMeetingId);
-    generateScript();
-  } else {
-    const savedView = sessionStorage.getItem('condscript_view');
-    const restorableTabs = ['builder','history','peopleHistory'];
-    switchTab(restorableTabs.includes(savedView) ? savedView : 'history');
+    if (currentMeetingId === savedScriptMeetingId) {
+      generateScript();
+      return;
+    }
+    if (restoreCachedScript()) return;
   }
+  const restorableTabs = ['builder','history','peopleHistory'];
+  switchTab(restorableTabs.includes(savedView) ? savedView : 'history');
 }
 
 function showLoginScreen() {
