@@ -1554,6 +1554,7 @@ function switchTab(tab) {
     sessionStorage.removeItem('condscript_script_meeting_id');
   }
   activeTabName = tab;
+  sessionStorage.setItem('condscript_view', tab);
   document.getElementById('app').style.display        = tab === 'builder' ? '' : 'none';
   document.getElementById('configTab').style.display  = tab === 'config'  ? '' : 'none';
   document.getElementById('historyTab').style.display = tab === 'history' ? '' : 'none';
@@ -3456,7 +3457,9 @@ async function initAuth() {
     await loadMeetingById(savedScriptMeetingId);
     generateScript();
   } else {
-    switchTab('history');
+    const savedView = sessionStorage.getItem('condscript_view');
+    const restorableTabs = ['builder','history','peopleHistory'];
+    switchTab(restorableTabs.includes(savedView) ? savedView : 'history');
   }
 }
 
@@ -3469,7 +3472,6 @@ function showApp() {
   document.querySelector('.tab-nav').style.display      = '';
   applyWardIdentity({ force: true });
   updateAuthHeader();
-  switchTab('history');
 }
 
 function showWardSetup() {
