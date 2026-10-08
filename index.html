@@ -439,8 +439,9 @@ select { cursor: pointer; appearance: none;
     overflow-wrap: anywhere;
     letter-spacing: .06em;
   }
-  .history-item { align-items: flex-start; flex-direction: column; }
-  .history-item > div:last-child { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .history-item { align-items: center; flex-direction: row; gap: 8px; padding: 8px 10px; }
+  .history-item > div:first-child { min-width: 0; }
+  .history-item > div:last-child { width: auto; flex: 0 0 auto; justify-content: flex-end; flex-wrap: nowrap; }
   .history-search-row { flex-direction: column; align-items: stretch; }
   .history-table { min-width: 460px; }
 }
