@@ -4149,7 +4149,7 @@ async function loadHistoryTab() {
     const location = m.location || '';
     const isCurrent = m.id === currentMeetingId;
     const isPast = d < today;
-    const meta = [time, location, m.presiding_name ? `Presiding: ${m.presiding_name}` : '', isPast ? 'Past meeting' : 'Upcoming'].filter(Boolean).join(' - ');
+    const meta = [time, location, isPast ? 'Past meeting' : 'Upcoming'].filter(Boolean).join(' - ');
     const label = formatMeetingLabelFromParts(m.meeting_date, m.meeting_time, location);
     const encodedLabel = encodeURIComponent(label);
     return `<div class="history-item clickable" role="button" tabindex="0" onclick="navigateToMeeting('${m.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();navigateToMeeting('${m.id}')}" style="${isCurrent?'border-color:var(--navy);background:#eff6ff;':''}">
