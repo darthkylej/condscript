@@ -267,10 +267,9 @@ select { cursor: pointer; appearance: none;
 /* ══════════════════════════════════════════════════════════════
    SCRIPT OUTPUT
 ══════════════════════════════════════════════════════════════ */
-#scriptView { display: none; position: fixed; inset: 0; background: #f8f7f2; z-index: 200; overflow-y: auto; }
+#scriptView { display: none; background: #f8f7f2; min-height: calc(100vh - 100px); }
 #scriptView.show { display: block; }
-.script-toolbar { background: var(--navy); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; }
-.script-toolbar h2 { font-size: .95rem; font-weight: 600; flex: 1; }
+.script-actions { display:flex; gap:8px; align-items:center; margin-left:auto; padding-right:12px; }
 .script-page { max-width: 680px; margin: 0 auto; padding: 32px 24px 72px; font-family: var(--serif); }
 .script-meeting-header { text-align: center; padding: 18px 20px 16px; margin-bottom: 28px; border-top: 4px solid var(--navy); border-bottom: 4px solid var(--navy); }
 .script-meeting-header .ward-name    { font-size: 1.5rem; font-weight: 700; color: var(--navy); letter-spacing: .02em; text-transform: uppercase; }
@@ -1101,10 +1100,8 @@ select { cursor: pointer; appearance: none;
 </div>
 
 <div id="scriptView">
-  <div class="script-toolbar">
-    <button class="btn btn-secondary btn-sm" onclick="leaveScriptTo('history')">📅 Programs</button>
-    <button class="btn btn-secondary btn-sm" onclick="leaveScriptTo('builder')">📋 Builder</button>
-    <h2 id="scriptTitle">Conductor Script</h2>
+  <div class="script-actions">
+    <span id="scriptTitle" style="font-size:.8rem;color:var(--gray-600);margin-right:4px">Conductor Script</span>
     <button class="btn btn-secondary btn-sm" id="meetingLogBtn" onclick="openMeetingLog()">📝 Log</button>
     <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print</button>
   </div>
@@ -1549,6 +1546,13 @@ function escHtml(s) {
 
 /* ── Tab Switching ───────────────────────────────────────────── */
 function switchTab(tab) {
+  if(document.getElementById('scriptView')?.classList.contains('show')) {
+    stopMeetingLogSync();
+    closeMeetingLog();
+    document.getElementById('scriptView').classList.remove('show');
+    sessionStorage.removeItem('condscript_view');
+    sessionStorage.removeItem('condscript_script_meeting_id');
+  }
   activeTabName = tab;
   document.getElementById('app').style.display        = tab === 'builder' ? '' : 'none';
   document.getElementById('configTab').style.display  = tab === 'config'  ? '' : 'none';
@@ -2801,6 +2805,10 @@ function generateScript() {
     console.warn('Could not cache script for offline use:', e);
   }
 
+  document.getElementById('app').style.display='none';
+  document.getElementById('configTab').style.display='none';
+  document.getElementById('historyTab').style.display='none';
+  document.getElementById('peopleHistoryTab').style.display='none';
   document.getElementById('scriptView').classList.add('show');
   startMeetingLogSync();
   sessionStorage.setItem('condscript_view', 'script');
@@ -3190,6 +3198,10 @@ function restoreCachedScript() {
     document.querySelector('.tab-nav').style.display = '';
     document.getElementById('scriptTitle').textContent = cached.title || 'Conductor Script';
     document.getElementById('scriptContent').innerHTML = cached.html;
+    document.getElementById('app').style.display='none';
+    document.getElementById('configTab').style.display='none';
+    document.getElementById('historyTab').style.display='none';
+    document.getElementById('peopleHistoryTab').style.display='none';
     document.getElementById('scriptView').classList.add('show');
     ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
     document.getElementById('tbScript')?.classList.add('active');
