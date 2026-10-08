@@ -2235,6 +2235,13 @@ function samePersonName(a, b) {
 }
 
 function generateScript() {
+  if (!currentMeetingId) {
+    sessionStorage.removeItem('condscript_script_meeting_id');
+    if (sessionStorage.getItem('condscript_view') === 'script') sessionStorage.setItem('condscript_view','history');
+    switchTab('history');
+    alert('Select an existing program before opening Script.');
+    return;
+  }
   const ward       = g('wardName') || getWardDisplayName() || 'Ward';
   const dateStr    = formatDate(g('meetingDate'));
   const recogVisitors = visitors.filter(v => v.recognized);
@@ -3195,7 +3202,10 @@ function restoreCachedScript() {
   if (sessionStorage.getItem('condscript_view') !== 'script') return false;
   try {
     const cached = JSON.parse(localStorage.getItem(SCRIPT_CACHE_KEY) || 'null');
-    if (!cached?.html) return false;
+    if (!cached?.html || !cached?.meetingId) return false;
+    const expectedMeetingId = sessionStorage.getItem('condscript_script_meeting_id');
+    if (expectedMeetingId && String(cached.meetingId) !== String(expectedMeetingId)) return false;
+    currentMeetingId = String(cached.meetingId);
 
     document.getElementById('loginOverlay').style.display = 'none';
     document.querySelector('.tab-nav').style.display = '';
@@ -3422,6 +3432,15 @@ async function api(method, path, body = null) {
 // ── Auth ───────────────────────────────────────────────────────
 async function initAuth() {
   AUTH.token = localStorage.getItem(TOKEN_KEY);
+
+  // Script is the fail-safe conducting view. If this page was refreshed while
+  // Script was open, render the cached copy immediately before making any
+  // network request. A successful server load below will replace it with the
+  // latest version; a failed request leaves this usable copy on screen.
+  const restoringScript = sessionStorage.getItem('condscript_view') === 'script'
+    && !!sessionStorage.getItem('condscript_script_meeting_id');
+  if (restoringScript) restoreCachedScript();
+
   // Hide app until we know auth state
   document.getElementById('app').style.display        = 'none';
   document.getElementById('configTab').style.display  = 'none';
@@ -3433,8 +3452,9 @@ async function initAuth() {
 
   const me = await api('GET', '/auth/me');
   if (me.error || !me.email) {
-    // A network failure is different from an invalid login. If the user was
-    // already on Script view, keep the saved script available offline.
+    // A network failure must never displace a conducting script that was
+    // already rendered from the local cache.
+    if (restoringScript && restoreCachedScript()) return;
     if (!navigator.onLine || (me.error && !me.status)) {
       if (restoreCachedScript()) return;
     }
