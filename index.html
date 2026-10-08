@@ -269,7 +269,6 @@ select { cursor: pointer; appearance: none;
 ══════════════════════════════════════════════════════════════ */
 #scriptView { display: none; background: #f8f7f2; min-height: calc(100vh - 100px); }
 #scriptView.show { display: block; }
-.script-actions { display:flex; gap:8px; align-items:center; margin-left:auto; padding-right:12px; }
 .script-page { max-width: 680px; margin: 0 auto; padding: 32px 24px 72px; font-family: var(--serif); }
 .script-meeting-header { text-align: center; padding: 18px 20px 16px; margin-bottom: 28px; border-top: 4px solid var(--navy); border-bottom: 4px solid var(--navy); }
 .script-meeting-header .ward-name    { font-size: 1.5rem; font-weight: 700; color: var(--navy); letter-spacing: .02em; text-transform: uppercase; }
@@ -594,6 +593,10 @@ select { cursor: pointer; appearance: none;
   <button class="tab-btn active" id="tbHistory" onclick="switchTab('history')">📅 Programs</button>
   <button class="tab-btn" id="tbPeopleHistory" onclick="switchTab('peopleHistory')">🕘 History</button>
   <button class="tab-btn" id="tbScript" onclick="generateScript()">📄 Script</button>
+  <div id="scriptNavActions" style="display:none;margin-left:auto">
+    <button class="tab-btn" id="meetingLogBtn" onclick="openMeetingLog()">📝 Log</button>
+    <button class="tab-btn" onclick="window.print()">🖨 Print</button>
+  </div>
 </nav>
 
 <!-- ═══════════ BUILDER TAB ═══════════ -->
@@ -1100,11 +1103,7 @@ select { cursor: pointer; appearance: none;
 </div>
 
 <div id="scriptView">
-  <div class="script-actions">
-    <span id="scriptTitle" style="font-size:.8rem;color:var(--gray-600);margin-right:4px">Conductor Script</span>
-    <button class="btn btn-secondary btn-sm" id="meetingLogBtn" onclick="openMeetingLog()">📝 Log</button>
-    <button class="btn btn-gold btn-sm" onclick="window.print()">🖨 Print</button>
-  </div>
+  <div id="scriptTitle" style="display:none">Conductor Script</div>
   <div class="script-page" id="scriptContent"></div>
 </div>
 
@@ -1559,11 +1558,12 @@ function switchTab(tab) {
   document.getElementById('configTab').style.display  = tab === 'config'  ? '' : 'none';
   document.getElementById('historyTab').style.display = tab === 'history' ? '' : 'none';
   document.getElementById('peopleHistoryTab').style.display = tab === 'peopleHistory' ? '' : 'none';
-  document.getElementById('tbBuilder').classList.toggle('active', tab === 'builder');
-  document.getElementById('tbConfig')?.classList.toggle('active',  tab === 'config');
-  document.getElementById('tbHistory').classList.toggle('active', tab === 'history');
-  document.getElementById('tbPeopleHistory').classList.toggle('active', tab === 'peopleHistory');
-  document.getElementById('tbScript').classList.remove('active');
+  document.getElementById('tbBuilder').style.display = tab === 'builder' ? 'none' : '';
+  document.getElementById('tbConfig') && (document.getElementById('tbConfig').style.display = tab === 'config' ? 'none' : '');
+  document.getElementById('tbHistory').style.display = tab === 'history' ? 'none' : '';
+  document.getElementById('tbPeopleHistory').style.display = tab === 'peopleHistory' ? 'none' : '';
+  document.getElementById('tbScript').style.display = '';
+  document.getElementById('scriptNavActions').style.display = 'none';
   if (tab === 'config')  renderConfigTab();
   if (tab === 'history') loadHistoryTab();
   if (tab === 'peopleHistory') loadPeopleHistory();
@@ -2824,8 +2824,9 @@ function generateScript() {
     sessionStorage.setItem('condscript_view', 'script');
   }
   scriptReturnTab = activeTabName || 'builder';
-  ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
-  document.getElementById('tbScript')?.classList.add('active');
+  ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display=''; });
+  document.getElementById('tbScript').style.display='none';
+  document.getElementById('scriptNavActions').style.display='flex';
   window.scrollTo(0,0);
 }
 
@@ -3216,8 +3217,9 @@ function restoreCachedScript() {
     document.getElementById('historyTab').style.display='none';
     document.getElementById('peopleHistoryTab').style.display='none';
     document.getElementById('scriptView').classList.add('show');
-    ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => document.getElementById(id)?.classList.remove('active'));
-    document.getElementById('tbScript')?.classList.add('active');
+    ['tbBuilder','tbConfig','tbHistory','tbPeopleHistory'].forEach(id => { const el=document.getElementById(id); if(el) el.style.display=''; });
+    document.getElementById('tbScript').style.display='none';
+    document.getElementById('scriptNavActions').style.display='flex';
     return true;
   } catch (e) {
     console.warn('Could not restore cached script:', e);
