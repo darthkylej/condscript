@@ -2248,7 +2248,7 @@ function generateScript() {
   const dateStr    = formatDate(g('meetingDate'));
   const recogVisitors = visitors.filter(v => v.recognized);
   const presidingVis  = getPresidingVisitor(recogVisitors);
-  const standVisitors = recogVisitors.filter(v => v !== presidingVis);
+  const standVisitors = recogVisitors; // Recognize all stake visitors, including the one presiding.
   const presiding  = presidingVis ? (presidingVis.name || '[Name]') : g('presidingName');
   const conducting = g('conductingName');
   const chorister  = g('chorister');
