@@ -1161,7 +1161,8 @@ select { cursor: pointer; appearance: none;
           <option value="">— Select calling —</option>
           <option value="highcouncilor">High Councilor</option>
           <option value="stakepres">Stake President</option>
-          <option value="stakepres-counselor">Counselor in Stake Presidency</option>
+          <option value="stakepres-first-counselor">First Counselor in Stake Presidency</option>
+          <option value="stakepres-second-counselor">Second Counselor in Stake Presidency</option>
           <option value="templepres">Temple President</option>
           <option value="templematron">Temple Matron</option>
           <option value="missionpres">Mission President</option>
@@ -1923,6 +1924,8 @@ const CALLING_INFO = {
   area70:              { recognize:true,          presides:true,  presideRank:60,  desc:'Area Seventy', recognition:'an Area Seventy' },
   stakepres:           { recognize:true,          presides:true,  presideRank:50,  desc:'Stake President', recognition:'the stake president' },
   'stakepres-counselor':{ recognize:true,         presides:true,  presideRank:40,  desc:'Counselor in Stake Presidency', recognition:'a counselor in the stake presidency' },
+  'stakepres-first-counselor': { recognize:true, presides:true, presideRank:40, desc:'First Counselor in Stake Presidency', recognition:'the first counselor in the stake presidency' },
+  'stakepres-second-counselor': { recognize:true, presides:true, presideRank:40, desc:'Second Counselor in Stake Presidency', recognition:'the second counselor in the stake presidency' },
   missionpres:         { recognize:true,          presides:false, presideRank:0,   desc:'Mission President', recognition:'the mission president' },
   highcouncilor:       { recognize:'ask',         presides:false, presideRank:0,   desc:'High Councilor', recognition:'of the stake high council' },
   templepres:          { recognize:true,          presides:false, presideRank:0,   desc:'Temple President', recognition:'the temple president' },
