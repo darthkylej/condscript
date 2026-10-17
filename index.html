@@ -4113,13 +4113,21 @@ async function navigateToMeeting(id) {
   currentMeetingDate = date;
   document.getElementById('meetingDate').value = date;
   updateCurrentProgramBanner();
-  switchTab('builder');
 
-  // Load program data in the background
+  // Load the selected program before generating its script; never display
+  // a script built from the previously selected meeting's form data.
   try {
-    await loadMeetingById(id);
+    const result = await api('GET', `/meetings/id/${id}`);
+    if (result.error || !result.meeting) {
+      alert(result.error || 'Could not load the selected program.');
+      return;
+    }
+    loadMeetingIntoForm(result.meeting);
+    generateScript();
   } catch(e) {
-    console.error('loadMeetingById failed:', e);
+    console.error('Loading selected program failed:', e);
+    alert('Could not load the selected program. Please try again.');
+    return;
   }
 
   loadHistoryTab();
